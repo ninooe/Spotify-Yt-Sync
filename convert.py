@@ -8,7 +8,7 @@ import re
 import time
 import json
 
-import yt_api as yt_api
+import yt_api as yt_api_obj
 
 import selenium
 from selenium import webdriver
@@ -28,13 +28,14 @@ import chromedriver_autoinstaller
 class Yt_sptfy_converter:
 
 
-    def __init__(self):
+    def __init__(self, yt_api):
 
         # Read Configfile
         configfile = "config.ini"
         config = ConfigParser()
         config.read(configfile)
 
+        self.yt_api = yt_api
 
         # Load progress tracker
         self.path_to_progress_json = "./progress.json"
@@ -62,9 +63,9 @@ class Yt_sptfy_converter:
 
 
         # Get Spotify Credentials
-        self.loginName = config["options"]["accountNameOrEmail"]
-        if config["options"]["password"] != None:
-            self.pw = config["options"]["password"]
+        self.loginName = config["spotify"]["accountNameOrEmail"]
+        if config["spotify"]["password"] != None:
+            self.pw = config["spotify"]["password"]
         else:
             self.pw = getpass('Password: ')
 
@@ -190,7 +191,7 @@ class Yt_sptfy_converter:
             playlist_id = self.progress_dict[playlist_name]["playlist_id"]
             querys_done = self.progress_dict[playlist_name]["querys_done"]
         else:
-            playlist_id = yt_api.create_playlist(playlist_name)["id"]
+            playlist_id = self.yt_api.create_playlist(playlist_name)["id"]
             self.progress_dict[playlist_name] = {"playlist_id": playlist_id, "querys_done": {}}
             querys_done = {}
         # Search for songs and add to playlist
@@ -198,7 +199,7 @@ class Yt_sptfy_converter:
             if not query in querys_done.keys():
                 video_link = self.get_link_to_video_by_query(query)
                 video_id = re.search(r"https://www.youtube.com/watch.v=(.*)", video_link, re.IGNORECASE).group(1)
-                playlist_item_id = yt_api.add_item_to_playlist(playlist_id, video_id)["id"]
+                playlist_item_id = self.yt_api.add_item_to_playlist(playlist_id, video_id)["id"]
                 querys_done[query] = playlist_item_id
                 # Save progress
                 self.progress_dict[playlist_name]["querys_done"] = querys_done
@@ -207,7 +208,7 @@ class Yt_sptfy_converter:
         # Search for songs not longer in playlist and delete
         for query in list(querys_done.keys()).copy():
             if not query in querylist: 
-                yt_api.delete_item_from_playlist(querys_done[query])
+                self.yt_api.delete_item_from_playlist(querys_done[query])
                 # Save progress
                 querys_done.pop(query, None)
                 with open(self.path_to_progress_json, 'w') as json_file:
@@ -251,10 +252,10 @@ class Yt_sptfy_converter:
 
     def sync_user_profile(self):
         
-        channel_id = yt_api.get_user_channel()['items'][0]["id"]
-        print(yt_api.get_playlists(channel_id))
+        #channel_id = self.yt_api.get_user_channel()['items'][0]["id"]
+
         
-        sys.exit()
+        
         self.open_spotify_session()
         for playlist_link in self.get_playlistlinks_from_profile("https://open.spotify.com/user/eo81sypyqdkath705ozd16yzh"):
             self.convert_playlist(playlist_link)
@@ -264,7 +265,8 @@ class Yt_sptfy_converter:
 
 def main():
 
-    sptfy = Yt_sptfy_converter()
+    yt_api = yt_api_obj.Yt_api()
+    sptfy = Yt_sptfy_converter(yt_api)
     sptfy.sync_user_profile()
 
 if __name__ == "__main__":
