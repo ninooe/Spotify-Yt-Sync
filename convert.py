@@ -28,14 +28,17 @@ import chromedriver_autoinstaller
 class Yt_sptfy_converter:
 
 
-    def __init__(self, yt_api):
+    def __init__(self):
+
+        # Load Api do quota check
+        self.yt_api = yt_api_obj.Yt_api()
+        _ = self.yt_api.get_user_channel()['items'][0]["id"]
 
         # Read Configfile
         configfile = "config.ini"
         config = ConfigParser()
         config.read(configfile)
 
-        self.yt_api = yt_api
 
         # Load progress tracker
         self.path_to_progress_json = "./progress.json"
@@ -51,6 +54,7 @@ class Yt_sptfy_converter:
         options = Options()
         # options.add_argument("--start-maximized")
         options.add_argument('ignore-certificate-errors')
+        options.add_argument("--enable-webgl")
         options.add_experimental_option('excludeSwitches', ['enable-automation'])
         self.driver = webdriver.Chrome(options=options)
 
@@ -68,7 +72,18 @@ class Yt_sptfy_converter:
             self.pw = config["spotify"]["password"]
         else:
             self.pw = getpass('Password: ')
+        
 
+        # Convert 
+        self.open_spotify_session()
+
+        for entry in config["sync_links"]:
+            link = config["sync_links"][entry]
+            if re.search(r"^https://open.spotify.com/user/", link):
+                self.sync_user_profile(link)
+            if re.search(r"^https://open.spotify.com/playlist/", link):
+                self.convert_playlist(link)
+            else: print("could not convert:", link)
 
     def get_tracks_and_artists(self, spotify_link):
 
@@ -250,14 +265,9 @@ class Yt_sptfy_converter:
         return playlist_linklist
 
 
-    def sync_user_profile(self):
-        
-        #channel_id = self.yt_api.get_user_channel()['items'][0]["id"]
-
-        
-        
-        self.open_spotify_session()
-        for playlist_link in self.get_playlistlinks_from_profile("https://open.spotify.com/user/eo81sypyqdkath705ozd16yzh"):
+    def sync_user_profile(self, profile_link):
+    
+        for playlist_link in self.get_playlistlinks_from_profile(profile_link):
             self.convert_playlist(playlist_link)
 
         
@@ -265,9 +275,7 @@ class Yt_sptfy_converter:
 
 def main():
 
-    yt_api = yt_api_obj.Yt_api()
-    sptfy = Yt_sptfy_converter(yt_api)
-    sptfy.sync_user_profile()
+    Yt_sptfy_converter()
 
 if __name__ == "__main__":
     main()
