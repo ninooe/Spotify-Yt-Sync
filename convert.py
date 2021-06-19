@@ -2,6 +2,7 @@
 
 import datetime
 from getpass import getpass
+import os
 from os import name
 import sys
 import re
@@ -85,11 +86,12 @@ class Yt_sptfy_converter:
                 self.convert_playlist(link)
             else: print("could not convert:", link)
 
+
     def get_tracks_and_artists(self, spotify_link):
 
         self.driver.get(spotify_link)
         try:
-            parentElement = WebDriverWait(self.driver, 10).until(
+            parentElement = WebDriverWait(self.driver, 30).until(
                     EC.presence_of_element_located((By.XPATH, '''//*[@id="main"]/div/div[2]/div[3]/main/div[2]/div[2]/div/div/div[2]/section/div[2]/div[3]/div[1]'''))
                 )
         except: 
@@ -130,13 +132,13 @@ class Yt_sptfy_converter:
         self.driver.get(r"https://www.spotify.com")
 
         # Navigate to loginpage
-        confirmkey = WebDriverWait(self.driver, 10).until(
+        confirmkey = WebDriverWait(self.driver, 30).until(
             EC.presence_of_element_located((By.XPATH, '''//*[@id="__next"]/div[1]/header/div/nav/ul/li[6]/a'''))
         )
         confirmkey.click()
 
         # Confirm login
-        loginformUsername = WebDriverWait(self.driver, 10).until(
+        loginformUsername = WebDriverWait(self.driver, 30).until(
             EC.presence_of_element_located((By.NAME, '''username'''))
         )
         loginformUsername.send_keys(self.loginName)
@@ -166,7 +168,7 @@ class Yt_sptfy_converter:
         except: pass
 
         try:
-            resultlist = WebDriverWait(self.driver, 10).until(
+            resultlist = WebDriverWait(self.driver, 30).until(
                 EC.presence_of_element_located((By.XPATH, '''//*[@id="page-manager"]/ytd-search'''))
             )
         except: return False
@@ -231,20 +233,21 @@ class Yt_sptfy_converter:
                 
 
     def get_playlist_name(self, spotify_link):
-
-        self.driver.get(spotify_link)
-        name = WebDriverWait(self.driver, 10).until(
-            EC.presence_of_element_located((By.CLASS_NAME, '''a12b67e576d73f97c44f1f37026223c4-scss'''))
-        )
         
-
-        return name.text
+        try:
+            self.driver.get(spotify_link)
+            name = WebDriverWait(self.driver, 30).until(
+                EC.presence_of_element_located((By.CLASS_NAME, '''a12b67e576d73f97c44f1f37026223c4-scss'''))
+            )
+            return name.text
+        except:
+            return self.get_playlist_name(spotify_link)
 
 
     def get_playlistlinks_from_profile(self, profile_link):
 
         self.driver.get(profile_link)
-        # profileIcon = WebDriverWait(self.driver, 10).until(
+        # profileIcon = WebDriverWait(self.driver, 30).until(
         #     EC.presence_of_element_located((By.CLASS_NAME, '''_3e75c7f07bdce28b37b45a5cd74ff371-scss'''))
         # )
         # profileIcon.click()
@@ -253,7 +256,7 @@ class Yt_sptfy_converter:
         link_to_playlists = profile_link + "/playlists"
         self.driver.get(link_to_playlists)
 
-        playlists_field = WebDriverWait(self.driver, 10).until(
+        playlists_field = WebDriverWait(self.driver, 30).until(
             EC.presence_of_element_located((By.XPATH, '''//*[@id="main"]/div/div[2]/div[3]/main/div[2]/div[2]/div/div/div[2]/section/section/div[2]'''))
         )
 
@@ -274,6 +277,10 @@ class Yt_sptfy_converter:
 
 
 def main():
+
+    abspath = os.path.abspath(__file__)
+    dname = os.path.dirname(abspath)
+    os.chdir(dname)
 
     Yt_sptfy_converter()
 

@@ -42,7 +42,7 @@ class Yt_api:
             else:
                 print('Fetching New Tokens...')
                 flow = InstalledAppFlow.from_client_secrets_file(
-                    client_secrets_path,
+                    self.client_secrets_path,
                     scopes=[
                         'https://www.googleapis.com/auth/youtube'
                     ]
