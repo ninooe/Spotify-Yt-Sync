@@ -60,7 +60,7 @@ class Yt_sptfy_converter:
         self.driver = webdriver.Chrome(options=options)
 
 
-        # Check if driver version is matches chrome installation
+        # Check if driver version matches chrome installation
         str1 = self.driver.capabilities['browserVersion']
         str2 = self.driver.capabilities['chrome']['chromedriverVersion'].split(' ')[0]
         if str1[0:2] != str2[0:2]:  
