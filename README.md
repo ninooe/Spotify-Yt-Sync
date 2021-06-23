@@ -16,3 +16,5 @@ Just add links for profiles or playlists in config.ini
 
 Do not change the windowsize for chromedriver
 
+
+For now logininformation to spotify is not required, just leave confic undefinded and everything should still work
