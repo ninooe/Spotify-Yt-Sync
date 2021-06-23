@@ -10,7 +10,7 @@ and it does not use the Spotify api at all. This greatly reduces setup time.
 Setup:
 https://www.youtube.com/watch?v=HzICUriU3k0&ab_channel=JieJenn
 
-Just add links for profiles or playlists in config.ini
+Just add links for profiles or playlists to be converted in config.ini
 
 
 
