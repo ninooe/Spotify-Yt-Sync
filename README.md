@@ -21,6 +21,7 @@ For now, login information for spotify is not required, just leave config undefi
 
 TODO:
 - Change names of playlist
+- automate envsetup
 - Testing
 - Improved filter for Songs
 - Enable sync in both directions
