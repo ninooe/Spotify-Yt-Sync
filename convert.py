@@ -24,6 +24,12 @@ from configparser import ConfigParser
 import chromedriver_autoinstaller
 
 
+def reg_is_in_filter(filters: list, body: str) -> bool:
+    for filter in filters:
+        if re.search(filter, body):
+            return True
+    return False
+
 
 
 class Yt_sptfy_converter:
@@ -157,7 +163,7 @@ class Yt_sptfy_converter:
 
     def get_link_to_video_by_query(self, query):
         '''query example: "searchterm1+searchterm2"'''
-    
+        filterforvideo = [r"&list=", r"[Clean]", r"[clean]"]
         self.driver.get("https://www.youtube.com/results?search_query="+query)
         
         try:
@@ -179,7 +185,7 @@ class Yt_sptfy_converter:
             href = str(link.get_attribute('href'))
             if not href is None:
                 if re.search(r"^https://www.youtube.com/watch", href):
-                    if not re.search(r"&list=", href):
+                    if not reg_is_in_filter(filterforvideo, href):
                         return(href)
         return False
 
