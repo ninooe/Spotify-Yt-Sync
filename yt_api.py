@@ -1,8 +1,9 @@
 
-#!.\sptfy-env\Scripts\python.exe
+#!.\sp_yt_env\Scripts\python.exe
 import sys
 import pickle
 import os
+import logging
 
 
 from google.auth.transport import Request
@@ -16,45 +17,53 @@ class Yt_api:
 
     def __init__(self) -> None:
         
-        self.credentials = None
         self.client_secrets_path = r'client_secret.json'
-
+        self.path_to_token = "token.pickle"
         self.serviceYT = build("youtube", "v3", credentials=self.load_credentials())
 
+        #############insert here custom logger##############################
 
     def load_credentials(self):
-        # token.pickle stores credentials from previously successful logins
-        if os.path.exists('token.pickle'):
-            print('Loading Credentials From File...')
-            with open('token.pickle', 'rb') as token:
-                credentials = pickle.load(token)
-        else: credentials = None
+
+        def credentials_from_file(path:str):
+            logging.info('Loading Credentials From File...')
+            if not os.path.exists(path):
+                return None
+            with open(path, 'rb') as token:
+                # token.pickle stores credentials from previously successful logins
+                return pickle.load(token)
+
+        credentials = credentials_from_file(self.path_to_token)
 
         # If there are no valid credentials available, then either refresh the token or log in.
-        if not credentials or not credentials.valid:
-            if credentials and credentials.expired and credentials.refresh_token:
-                print('Refreshing Access Token...')
-                try:
-                    credentials.refresh(Request())
-                except:
-                    os.remove("token.pickle")
-                    self.load_credentials()
-            else:
-                print('Fetching New Tokens...')
-                flow = InstalledAppFlow.from_client_secrets_file(
-                    self.client_secrets_path,
-                    scopes=[
-                        'https://www.googleapis.com/auth/youtube'
-                    ]
-                )
-                flow.run_local_server(port=8080, prompt='consent',
-                                    authorization_prompt_message='')
-                credentials = flow.credentials
+        if credentials and credentials.valid:
+            return credentials
+         # if credentials present try to loading, if this failes delete and retry
+        if credentials:
+            logging.info('Refreshing Access Token...')
+            try:
+                credentials.refresh(Request())
+            except Exception as error:
+                logging.info(f"{error=} while loading {self.path_to_token}, removing before retry")
+                os.remove(self.path_to_token)
+                return self.load_credentials()
+        
 
-                # Save the credentials for the next run
-                with open('token.pickle', 'wb') as f:
-                    print('Saving Credentials for Future Use...')
-                    pickle.dump(credentials, f)
+        logging.info('Fetching New Tokens...')
+        flow = InstalledAppFlow.from_client_secrets_file(
+            self.client_secrets_path,
+            scopes=[
+                'https://www.googleapis.com/auth/youtube'
+            ]
+        )
+        flow.run_local_server(port=8080, prompt='consent',
+                            authorization_prompt_message='')
+        credentials = flow.credentials
+
+        # Save the credentials for the next run
+        with open('token.pickle', 'wb') as f:
+            logging.info('Saving Credentials for Future Use...')
+            pickle.dump(credentials, f)
 
         return credentials        
         

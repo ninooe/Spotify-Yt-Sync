@@ -1,5 +1,7 @@
 # Spotify-Yt-Sync
 
+########## REPO IN BROKEN STATE DUE TO REFACTORING #############
+
 This script scans spotify playlists and creates matching youtube playlists.
 
 Also it is able to keeps track of progress and will update the created playlists => remove items
@@ -33,3 +35,5 @@ For now, login information for spotify is not required, just leave config undefi
 
 TODO:
 - Change names of playlist
+- Add logging configuration
+- switch to sqlite

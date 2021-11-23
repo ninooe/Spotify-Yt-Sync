@@ -1,5 +1,3 @@
-#!.\sptfy-env\Scripts\python.exe
-
 import datetime
 from getpass import getpass
 import os
@@ -8,8 +6,10 @@ import sys
 import re
 import time
 import json
+import logging
 
 import yt_api as yt_api_obj
+import sqlite_handler as sqlite
 
 import selenium
 from selenium import webdriver
@@ -23,6 +23,7 @@ from selenium.webdriver.common.action_chains import ActionChains
 from configparser import ConfigParser
 import chromedriver_autoinstaller
 
+print(type(By.CSS_SELECTOR))
 
 def reg_is_in_filter(filters: list, body: str) -> bool:
     for filter in filters:
@@ -30,16 +31,36 @@ def reg_is_in_filter(filters: list, body: str) -> bool:
             return True
     return False
 
+def sel_helper_wait_for_elem(locator: str, query: str, driver: selenium.webdriver, timeout: int = 30):
+    """Let selenium driver wait for element
 
+    Args:
+        locator (str): locator present in this set selenium.webdriver.common.by
+        query (str): description of element matching locator
+        driver (webdriver): instance of selenium.webdriver
+        timeout (int, optional): time to wait before timeout. Defaults to 30.
+
+    Returns:
+        selenium.webdriver.remote.webelement.WebElement / None
+    """
+    try:
+        parentElement = WebDriverWait(driver, timeout).until(
+                EC.presence_of_element_located((locator, query))
+            )
+        return parentElement
+    except Exception:
+        logging.debug(f"{Exception} occured while waiting for element")
+        return None
+    
 
 class Yt_sptfy_converter:
 
 
     def __init__(self):
 
-        # Load Api do quota check
-        self.yt_api = yt_api_obj.Yt_api()
-        _ = self.yt_api.get_user_channel()['items'][0]["id"]
+        # # Load Api do quota check
+        # self.yt_api = yt_api_obj.Yt_api()
+        # _ = self.yt_api.get_user_channel()['items'][0]["id"]
 
         # Read Configfile
         configfile = "config.ini"
@@ -56,79 +77,97 @@ class Yt_sptfy_converter:
             self.progress_dict = {}
 
 
-        # Initialize Chromedriver
-        chromedriver_autoinstaller.install()
-        options = Options()
-        # options.add_argument("--start-maximized")
-        options.add_argument('ignore-certificate-errors')
-        options.add_argument("--enable-webgl")
-        options.add_experimental_option('excludeSwitches', ['enable-automation'])
-        self.driver = webdriver.Chrome(options=options)
+
+        def initialize_chromedriver() -> webdriver.Chrome:
+            chromedriver_autoinstaller.install()
+            options = Options()
+            # options.add_argument("--start-maximized")
+            options.add_argument('ignore-certificate-errors')
+            options.add_argument("--enable-webgl")
+            options.add_experimental_option('excludeSwitches', ['enable-automation'])
+            driver = webdriver.Chrome(options=options)
 
 
-        # Check if driver version matches chrome installation
-        str1 = self.driver.capabilities['browserVersion']
-        str2 = self.driver.capabilities['chrome']['chromedriverVersion'].split(' ')[0]
-        if str1[0:2] != str2[0:2]:  
-            print("chromedriver_autoinstaller, failed to install matching chromedriver version. \nDownload manually from https://chromedriver.chromium.org/downloads and add path to driver initialisation")
+            # Check if driver version matches chrome installation
+            str1 = driver.capabilities['browserVersion']
+            str2 = driver.capabilities['chrome']['chromedriverVersion'].split(' ')[0]
+            if str1[0:2] != str2[0:2]:  
+                logging.error("chromedriver_autoinstaller, failed to install matching chromedriver version. \nDownload manually from https://chromedriver.chromium.org/downloads and add path to driver initialisation")
+                sys.exit(2)
+            return driver
 
-
-        # Get Spotify Credentials
-        self.loginName = config["spotify"]["accountNameOrEmail"]
-        if config["spotify"]["password"] != None:
-            self.pw = config["spotify"]["password"]
-        else:
-            self.pw = getpass('Password: ')
+        self.driver = initialize_chromedriver()
+        
+        # # Get Spotify Credentials
+        # self.loginName = config["spotify"]["accountNameOrEmail"]
+        # if config["spotify"]["password"] != None:
+        #     self.pw = config["spotify"]["password"]
+        # else:
+        #     self.pw = getpass('Password: ')
         
 
-        # Convert 
-        self.open_spotify_session()
+        # # Convert 
+        # self.open_spotify_session()
+
 
         for entry in config["sync_links"]:
             link = config["sync_links"][entry]
+            # Remove quotation if given in config
+            re_subs = [(r"^'''", ""), (r"^\"", ""), (r"^'", ""), (r"'''$", ""), (r"\"$", ""), (r"'$", "")]
+            link = self.re_sub_list(link, re_subs)
             if re.search(r"^https://open.spotify.com/user/", link):
                 self.sync_user_profile(link)
             if re.search(r"^https://open.spotify.com/playlist/", link):
                 self.convert_playlist(link)
-            else: print("could not convert:", link)
+            else: 
+                logging.info(f'{link} did not match user or playlist regex')
 
+    @staticmethod
+    def re_sub_list(string_to_edit:str, regex_list:list[(str, str),]) -> str:
+        """funktion that will repeatedly will call re.sub and return endresult
 
-    def get_tracks_and_artists(self, spotify_link):
+        Args:
+            string_to_edit (str): raw string
+            regex_list (list[(str, str),]): list of tuples (regex, replacement)
 
+        Returns:
+            str: edited string
+        """
+        for tup in regex_list:
+            string_to_edit = re.sub(tup[0], tup[1], string_to_edit)
+        return string_to_edit
+
+    def get_tracks_and_artists(self, spotify_link) -> list[(str, str), ]:
+        
+ 
         self.driver.get(spotify_link)
-        try:
-            parentElement = WebDriverWait(self.driver, 30).until(
-                    EC.presence_of_element_located((By.XPATH, '''//*[@id="main"]/div/div[2]/div[3]/main/div[2]/div[2]/div/div/div[2]/section/div[2]/div[3]/div[1]'''))
-                )
-        except: 
+        parentElement = sel_helper_wait_for_elem(By.XPATH, '''//*[@id="main"]/div/div[2]/div[3]/main/div[2]/div[2]/div/div/div[2]/section/div[2]/div[3]/div[1]''', self.driver)
+        if not parentElement:
             return self.get_tracks_and_artists(spotify_link)
-        subElementList = []
-        tracklist = []
-        target = None
 
+        subElementList: list[selenium.webdriver.remote.webelement.WebElement] = []
         while True:
             # Wait to load page
             time.sleep(0.5)
-            # Append to list of elements
-            subElementListScroll = parentElement.find_elements_by_css_selector('''div[role='row']''')
-            for element in subElementListScroll: 
-                if not element in subElementList: 
-                    text = element.text
-                    try:
-                        if not text.splitlines()[2] == "E":
-                            tracklist.append(text.splitlines()[2])
-                        else:
-                            tracklist.append(text.splitlines()[3])
-                        tracklist.append(text.splitlines()[1])
-                    except: pass
-                    subElementList.append(element)
-            # Check if reached end of list / scroll down
-            if target == subElementList[-1]: break
-            target = subElementList[-1]
+            found_elements = parentElement.find_elements_by_css_selector('''div[role='row']''')
+            new_elements = [elem for elem in found_elements if not elem in subElementList]
+            subElementList.extend(new_elements)
+            # if new elements are found scroll to last element
+            if not new_elements: break
             actions = ActionChains(self.driver)
-            actions.move_to_element(target)
+            actions.move_to_element(new_elements[-1])
             actions.perform()
-        del tracklist[:2]
+        # extract relevant info from found Webelements
+        tracklist: list[(str, str),] = []
+        for element in subElementList[1:]:
+            lines: list[str] = element.text.splitlines()
+            # lines:
+            # ['title', (optional 'E' tag), 'artist', 'album', 'time_since_added_to_playlist', 'duration']
+            if lines[1] == 'E':
+                tracklist.append((lines[0], lines[2]))
+            else:
+                tracklist.append((lines[0], lines[1]))
+
         return tracklist
 
 
@@ -189,57 +228,68 @@ class Yt_sptfy_converter:
                         return(href)
         return False
 
-
+    ########################## cleanup with tuple unpacking ##############################
     def convert_playlist(self, spotify_link):
         # Get tracks and build querys
         tracklist = self.get_tracks_and_artists(spotify_link)
-        querylist = []
-        i = 0
-        while True:
-            try:
-                query = tracklist[i] + " " + tracklist[i+1]
-                query = query.replace("&", "+")
-                query = query.replace(" ", "+")
-                query = query.replace(",", "+")
-                query = query.replace("+-+", "+")
-                query = query.replace("++", "+")
-                querylist.append(query)
-                i += 2
-            except: break
+        
+        def yt_query_from_keywords(keywords:list) -> str:
+            raw_query = ' '.join(keywords)
+            re_subs = [(r"&", r"+"), (r" ", r"+"), (r",", r"+"), (r"+-+", r"+"), (r"++", r"+")]
+            while True:
+                new_query = self.re_sub_list(raw_query, re_subs)
+                if new_query == raw_query: break
+                raw_query = new_query
+            return new_query
 
-        playlist_name = self.get_playlist_name(spotify_link)
-        playlist_name = playlist_name.replace("&", "and")
-        # Load progress
-        if playlist_name in self.progress_dict.keys():
-            playlist_id = self.progress_dict[playlist_name]["playlist_id"]
-            querys_done = self.progress_dict[playlist_name]["querys_done"]
-        else:
-            playlist_id = self.yt_api.create_playlist(playlist_name)["id"]
-            self.progress_dict[playlist_name] = {"playlist_id": playlist_id, "querys_done": {}}
-            querys_done = {}
-        # Search for songs and add to playlist
-        for query in querylist:
-            if not query in querys_done.keys():
-                video_link = self.get_link_to_video_by_query(query)
-                video_id = re.search(r"https://www.youtube.com/watch.v=(.*)", video_link, re.IGNORECASE).group(1)
-                playlist_item_id = self.yt_api.add_item_to_playlist(playlist_id, video_id)["id"]
-                querys_done[query] = playlist_item_id
-                # Save progress
-                self.progress_dict[playlist_name]["querys_done"] = querys_done
-                with open(self.path_to_progress_json, 'w') as json_file:
-                    json.dump(self.progress_dict, json_file)
-        # Search for songs not longer in playlist and delete
-        for query in list(querys_done.keys()).copy():
-            if not query in querylist: 
-                self.yt_api.delete_item_from_playlist(querys_done[query])
-                # Save progress
-                querys_done.pop(query, None)
-                with open(self.path_to_progress_json, 'w') as json_file:
-                    json.dump(self.progress_dict, json_file)
+        querylist = [yt_query_from_keywords(track) for track in tracklist]
+
+        # querylist = []
+        # i = 0
+        # while True:
+        #     try:
+        #         query = tracklist[i] + " " + tracklist[i+1]
+        #         query = query.replace("&", "+")
+        #         query = query.replace(" ", "+")
+        #         query = query.replace(",", "+")
+        #         query = query.replace("+-+", "+")
+        #         query = query.replace("++", "+")
+        #         querylist.append(query)
+        #         i += 2
+        #     except: break
+
+        # playlist_name = self.get_playlist_name(spotify_link)
+        # playlist_name = playlist_name.replace("&", "and")
+        # # Load progress
+        # if playlist_name in self.progress_dict.keys():
+        #     playlist_id = self.progress_dict[playlist_name]["playlist_id"]
+        #     querys_done = self.progress_dict[playlist_name]["querys_done"]
+        # else:
+        #     playlist_id = self.yt_api.create_playlist(playlist_name)["id"]
+        #     self.progress_dict[playlist_name] = {"playlist_id": playlist_id, "querys_done": {}}
+        #     querys_done = {}
+        # # Search for songs and add to playlist
+        # for query in querylist:
+        #     if not query in querys_done.keys():
+        #         video_link = self.get_link_to_video_by_query(query)
+        #         video_id = re.search(r"https://www.youtube.com/watch.v=(.*)", video_link, re.IGNORECASE).group(1)
+        #         playlist_item_id = self.yt_api.add_item_to_playlist(playlist_id, video_id)["id"]
+        #         querys_done[query] = playlist_item_id
+        #         # Save progress
+        #         self.progress_dict[playlist_name]["querys_done"] = querys_done
+        #         with open(self.path_to_progress_json, 'w') as json_file:
+        #             json.dump(self.progress_dict, json_file)
+        # # Search for songs not longer in playlist and delete
+        # for query in list(querys_done.keys()).copy():
+        #     if not query in querylist: 
+        #         self.yt_api.delete_item_from_playlist(querys_done[query])
+        #         # Save progress
+        #         querys_done.pop(query, None)
+        #         with open(self.path_to_progress_json, 'w') as json_file:
+        #             json.dump(self.progress_dict, json_file)
                 
 
     def get_playlist_name(self, spotify_link):
-        
         try:
             self.driver.get(spotify_link)
             name = WebDriverWait(self.driver, 30).until(
