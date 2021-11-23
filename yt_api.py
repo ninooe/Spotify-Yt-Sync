@@ -21,12 +21,12 @@ class Yt_api:
         self.path_to_token = "token.pickle"
         self.serviceYT = build("youtube", "v3", credentials=self.load_credentials())
 
-        #############insert here custom logger##############################
-
+        self.logger = logging.getLogger(__name__)
+        
     def load_credentials(self):
 
         def credentials_from_file(path:str):
-            logging.info('Loading Credentials From File...')
+            self.logger.info('Loading Credentials From File...')
             if not os.path.exists(path):
                 return None
             with open(path, 'rb') as token:
@@ -40,16 +40,16 @@ class Yt_api:
             return credentials
          # if credentials present try to loading, if this failes delete and retry
         if credentials:
-            logging.info('Refreshing Access Token...')
+            self.logger.info('Refreshing Access Token...')
             try:
                 credentials.refresh(Request())
             except Exception as error:
-                logging.info(f"{error=} while loading {self.path_to_token}, removing before retry")
+                self.logger.info(f"{error=} while loading {self.path_to_token}, removing before retry")
                 os.remove(self.path_to_token)
                 return self.load_credentials()
         
 
-        logging.info('Fetching New Tokens...')
+        self.logger.info('Fetching New Tokens...')
         flow = InstalledAppFlow.from_client_secrets_file(
             self.client_secrets_path,
             scopes=[
@@ -62,7 +62,7 @@ class Yt_api:
 
         # Save the credentials for the next run
         with open('token.pickle', 'wb') as f:
-            logging.info('Saving Credentials for Future Use...')
+            self.logger.info('Saving Credentials for Future Use...')
             pickle.dump(credentials, f)
 
         return credentials        

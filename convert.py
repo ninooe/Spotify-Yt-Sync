@@ -20,10 +20,10 @@ from selenium.webdriver.support.ui import Select, WebDriverWait
 from selenium.webdriver.common.keys import Keys
 from selenium.webdriver.common.action_chains import ActionChains
 
+from selenium_helper import *
+
 from configparser import ConfigParser
 import chromedriver_autoinstaller
-
-print(type(By.CSS_SELECTOR))
 
 def reg_is_in_filter(filters: list, body: str) -> bool:
     for filter in filters:
@@ -31,26 +31,7 @@ def reg_is_in_filter(filters: list, body: str) -> bool:
             return True
     return False
 
-def sel_helper_wait_for_elem(locator: str, query: str, driver: selenium.webdriver, timeout: int = 30):
-    """Let selenium driver wait for element
 
-    Args:
-        locator (str): locator present in this set selenium.webdriver.common.by
-        query (str): description of element matching locator
-        driver (webdriver): instance of selenium.webdriver
-        timeout (int, optional): time to wait before timeout. Defaults to 30.
-
-    Returns:
-        selenium.webdriver.remote.webelement.WebElement / None
-    """
-    try:
-        parentElement = WebDriverWait(driver, timeout).until(
-                EC.presence_of_element_located((locator, query))
-            )
-        return parentElement
-    except Exception:
-        logging.debug(f"{Exception} occured while waiting for element")
-        return None
     
 
 class Yt_sptfy_converter:
@@ -68,13 +49,13 @@ class Yt_sptfy_converter:
         config.read(configfile)
 
 
-        # Load progress tracker
-        self.path_to_progress_json = "./progress.json"
-        try:
-            with open(self.path_to_progress_json) as f:
-                self.progress_dict = json.load(f)
-        except:
-            self.progress_dict = {}
+        # # Load progress tracker
+        # self.path_to_progress_json = "./progress.json"
+        # try:
+        #     with open(self.path_to_progress_json) as f:
+        #         self.progress_dict = json.load(f)
+        # except:
+        #     self.progress_dict = {}
 
 
 
@@ -141,18 +122,18 @@ class Yt_sptfy_converter:
         
  
         self.driver.get(spotify_link)
-        parentElement = sel_helper_wait_for_elem(By.XPATH, '''//*[@id="main"]/div/div[2]/div[3]/main/div[2]/div[2]/div/div/div[2]/section/div[2]/div[3]/div[1]''', self.driver)
+        parentElement = wait_for_element(By.XPATH, '''//*[@id="main"]/div/div[2]/div[3]/main/div[2]/div[2]/div/div/div[2]/section/div[2]/div[3]/div[1]''', self.driver)
         if not parentElement:
             return self.get_tracks_and_artists(spotify_link)
 
         subElementList: list[selenium.webdriver.remote.webelement.WebElement] = []
         while True:
-            # Wait to load page
+            # Wait for page to load
             time.sleep(0.5)
             found_elements = parentElement.find_elements_by_css_selector('''div[role='row']''')
             new_elements = [elem for elem in found_elements if not elem in subElementList]
             subElementList.extend(new_elements)
-            # if new elements are found scroll to last element
+            # if new elements are found scroll to last element 
             if not new_elements: break
             actions = ActionChains(self.driver)
             actions.move_to_element(new_elements[-1])
@@ -161,7 +142,7 @@ class Yt_sptfy_converter:
         tracklist: list[(str, str),] = []
         for element in subElementList[1:]:
             lines: list[str] = element.text.splitlines()
-            # lines:
+            # the structure of lines:
             # ['title', (optional 'E' tag), 'artist', 'album', 'time_since_added_to_playlist', 'duration']
             if lines[1] == 'E':
                 tracklist.append((lines[0], lines[2]))
@@ -177,55 +158,39 @@ class Yt_sptfy_converter:
         self.driver.get(r"https://www.spotify.com")
 
         # Navigate to loginpage
-        confirmkey = WebDriverWait(self.driver, 30).until(
-            EC.presence_of_element_located((By.XPATH, '''//*[@id="__next"]/div[1]/header/div/nav/ul/li[6]/a'''))
-        )
+        confirmkey = wait_for_element(By.XPATH, '''//*[@id="__next"]/div[1]/header/div/nav/ul/li[6]/a''', self.driver)
         confirmkey.click()
 
         # Confirm login
-        loginformUsername = WebDriverWait(self.driver, 30).until(
-            EC.presence_of_element_located((By.NAME, '''username'''))
-        )
+        loginformUsername = wait_for_element(By.NAME, '''username''', self.driver)
         loginformUsername.send_keys(self.loginName)
 
         self.driver.find_element_by_name('''password''').send_keys(self.pw)
         self.driver.find_element_by_id("login-button").click()
 
-        try:
-            confirmButton = WebDriverWait(self.driver, 3).until(
-                EC.presence_of_element_located((By.ID, '''onetrust-accept-btn-handler'''))
-            )
+        if (confirmButton := wait_for_element(By.ID, '''onetrust-accept-btn-handler''', self.driver)):
             confirmButton.click()
-        except:
-            pass
 
 
     def get_link_to_video_by_query(self, query):
         '''query example: "searchterm1+searchterm2"'''
-        filterforvideo = [r"&list=", r"[Clean]", r"[clean]"]
         self.driver.get("https://www.youtube.com/results?search_query="+query)
-        
-        try:
-            confirmkey = WebDriverWait(self.driver, 3).until(
-                EC.presence_of_element_located((By.XPATH, '''//*[@id="yDmH0d"]/c-wiz/div/div/div/div[2]/div[1]/div[4]/form/div[1]/div/button/span'''))
-            )
+
+        if (confirmkey := wait_for_element(By.XPATH, '''//*[@id="yDmH0d"]/c-wiz/div/div/div/div[2]/div[1]/div[4]/form/div[1]/div/button/span''', self.driver, timeout=3)):
             confirmkey.click()
-        except: pass
+        
+        if not (resultlist := wait_for_element(By.XPATH, '''//*[@id="page-manager"]/ytd-search''', self.driver, timeout=30)):
+            return False
 
-        try:
-            resultlist = WebDriverWait(self.driver, 30).until(
-                EC.presence_of_element_located((By.XPATH, '''//*[@id="page-manager"]/ytd-search'''))
-            )
-        except: return False
-
-        links = resultlist.find_elements_by_tag_name('a')
-
-        for link in links:
+        # filter what should be excluded from links
+        raw_list = [r"&list=", r"[Clean]", r"[clean]"]
+        reg_list = map(re.compile, raw_list)
+        # search for valid link
+        for link in resultlist.find_elements_by_tag_name('a'):
             href = str(link.get_attribute('href'))
-            if not href is None:
-                if re.search(r"^https://www.youtube.com/watch", href):
-                    if not reg_is_in_filter(filterforvideo, href):
-                        return(href)
+            if not href is None and re.search(r"^https://www.youtube.com/watch", href):
+                if not any(regex.match(href) for regex in reg_list): 
+                    return(href)
         return False
 
     ########################## cleanup with tuple unpacking ##############################
