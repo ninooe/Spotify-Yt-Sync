@@ -3,25 +3,34 @@ from sqlite3 import Error
 from sqlite3.dbapi2 import Connection
 import logging
 
+import yaml
+try:
+    from yaml import CLoader as Loader, CDumper as Dumper
+except ImportError:
+    from yaml import Loader, Dumper
+
 
 class Sqlite_handler():
 
-    def __init__(self) -> None:
+    def __init__(self, database_file:str) -> None:
 
         self.logger = logging.getLogger(__name__)
-        self.path_to_database: str = "progress.sqlite"
-        self.conn: Connection = self.load_database(self.path_to_database)
+        self.conn: Connection = self.load_database(database_file)
+
+        self.sql_schema = self.load_schema("sqlite_schema.yaml")
+
 
 
     def load_schema(self, path:str) -> dict:
-        return
+        with open(path, "r") as file:
+            return yaml.load(file, Loader)
 
     def load_database(self, path:str) -> Connection:
         connection = None
         try:
             connection = sqlite3.connect(path)
             self.logger.info("Connection to SQLite DB successful")
-        except Error as err:
+        except Exception as err:
             self.logger.error(f"{err}' occurred while connecting to {path=}")
         return connection
 
@@ -38,7 +47,10 @@ class Sqlite_handler():
 
 
     def q_exec(self, query: str):
-        return self.conn.execute(query)
+        cur = self.conn.cursor()
+        cur.execute(query)
+
+        # return self.conn.execute(query)
 
     def q_(self, query: str):
         cursor = self.conn.cursor()

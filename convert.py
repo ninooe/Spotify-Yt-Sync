@@ -5,11 +5,7 @@ from os import name
 import sys
 import re
 import time
-import json
 import logging
-
-import yt_api as yt_api_obj
-import sqlite_handler as sqlite
 
 import selenium
 from selenium import webdriver
@@ -20,6 +16,7 @@ from selenium.webdriver.support.ui import Select, WebDriverWait
 from selenium.webdriver.common.keys import Keys
 from selenium.webdriver.common.action_chains import ActionChains
 
+from yt_api import *
 from selenium_helper import *
 from sqlite_handler import *
 
@@ -36,11 +33,16 @@ class Yt_sptfy_converter:
         # self.yt_api = yt_api_obj.Yt_api()
         # _ = self.yt_api.get_user_channel()['items'][0]["id"]
 
+        self.logger = logging.getLogger(__name__)
+
         # Read Configfile
         configfile = "config.ini"
         config = ConfigParser()
         config.read(configfile)
 
+        self.sql = Sqlite_handler("progress.sqlite")
+
+        self.debugmode = False
 
         # # Load progress tracker
         # self.path_to_progress_json = "./progress.json"
@@ -58,6 +60,8 @@ class Yt_sptfy_converter:
             options.add_argument('ignore-certificate-errors')
             options.add_argument("--enable-webgl")
             options.add_experimental_option('excludeSwitches', ['enable-automation'])
+            if not self.debugmode: 
+                options.add_argument("--headless") 
             driver = webdriver.Chrome(options=options)
 
 
@@ -71,6 +75,7 @@ class Yt_sptfy_converter:
 
         self.driver = initialize_chromedriver()
         
+
         # # Connect to spotify account
         # # Get Spotify Credentials
         # self.loginName = config["spotify"]["accountNameOrEmail"]
@@ -83,6 +88,7 @@ class Yt_sptfy_converter:
         # def sync_user_profile(profile_link) -> list[str]:
         #     return [link for link in self.get_playlistlinks_from_profile(profile_link)]
         
+
         def get_playlist_links(raw_link) -> list[str]:
             # Remove quotation if given in config
             re_subs = [(r"^'''", ""), (r"^\"", ""), (r"^'", ""), (r"'''$", ""), (r"\"$", ""), (r"'$", "")]
@@ -97,12 +103,19 @@ class Yt_sptfy_converter:
 
         linklists = [get_playlist_links(config["sync_links"][entry]) for entry in config["sync_links"]]
         linklist = list(set([item for sublist in linklists for item in sublist]))
-        logging.error(linklist)
-        
-        
 
-        
+        for link in linklist:
+            name = self.get_playlist_name(link)
+            print(name, link)
+            self.sql.q_exec(f"INSERT INTO PLAYLISTS (NAME,SPOTIFY_LINK) \
+                            VALUES ('that','this')")
+                            # VALUES ({name},'{link}');")
+            # self.sql.q_exec(f"VALUES ({name}, {link});")
 
+
+            
+                
+        
 
     @staticmethod
     def re_sub_list(string_to_edit:str, regex_list:list[(str, str), ]) -> str:
@@ -119,9 +132,9 @@ class Yt_sptfy_converter:
             string_to_edit = re.sub(tup[0], tup[1], string_to_edit)
         return string_to_edit
 
+
     def get_tracks_and_artists(self, spotify_link) -> list[(str, str), ]:
         
- 
         self.driver.get(spotify_link)
         parentElement = wait_for_element(By.XPATH, '''//*[@id="main"]/div/div[2]/div[3]/main/div[2]/div[2]/div/div/div[2]/section/div[2]/div[3]/div[1]''', self.driver)
         if not parentElement:
@@ -245,8 +258,9 @@ class Yt_sptfy_converter:
     def get_playlist_name(self, spotify_link):
         try:
             self.driver.get(spotify_link)
-            return wait_for_element(By.CLASS_NAME, '''a12b67e576d73f97c44f1f37026223c4-scss''', self.driver).text
-        except:
+            return wait_for_element(By.CLASS_NAME, '''_meqsRRoQONlQfjhfxzp''', self.driver).text
+        except Exception:
+            self.logger.error("could not find playlist name, classname of element might be deprecated!")
             return self.get_playlist_name(spotify_link)
 
 
