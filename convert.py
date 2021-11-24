@@ -21,17 +21,10 @@ from selenium.webdriver.common.keys import Keys
 from selenium.webdriver.common.action_chains import ActionChains
 
 from selenium_helper import *
+from sqlite_handler import *
 
 from configparser import ConfigParser
 import chromedriver_autoinstaller
-
-def reg_is_in_filter(filters: list, body: str) -> bool:
-    for filter in filters:
-        if re.search(filter, body):
-            return True
-    return False
-
-
     
 
 class Yt_sptfy_converter:
@@ -58,7 +51,6 @@ class Yt_sptfy_converter:
         #     self.progress_dict = {}
 
 
-
         def initialize_chromedriver() -> webdriver.Chrome:
             chromedriver_autoinstaller.install()
             options = Options()
@@ -79,15 +71,13 @@ class Yt_sptfy_converter:
 
         self.driver = initialize_chromedriver()
         
+        # # Connect to spotify account
         # # Get Spotify Credentials
         # self.loginName = config["spotify"]["accountNameOrEmail"]
         # if config["spotify"]["password"] != None:
         #     self.pw = config["spotify"]["password"]
         # else:
         #     self.pw = getpass('Password: ')
-        
-
-        # # Convert 
         # self.open_spotify_session()
 
 
@@ -104,7 +94,7 @@ class Yt_sptfy_converter:
                 logging.info(f'{link} did not match user or playlist regex')
 
     @staticmethod
-    def re_sub_list(string_to_edit:str, regex_list:list[(str, str),]) -> str:
+    def re_sub_list(string_to_edit:str, regex_list:list[(str, str), ]) -> str:
         """funktion that will repeatedly will call re.sub and return endresult
 
         Args:
@@ -208,27 +198,14 @@ class Yt_sptfy_converter:
             return new_query
 
         querylist = [yt_query_from_keywords(track) for track in tracklist]
+        
+        playlist_name = self.get_playlist_name(spotify_link)
+        playlist_name = playlist_name.replace("&", "and")
+        # Load progress
+        if playlist_name in self.progress_dict.keys():
+            playlist_id = self.progress_dict[playlist_name]["playlist_id"]
+            querys_done = self.progress_dict[playlist_name]["querys_done"]
 
-        # querylist = []
-        # i = 0
-        # while True:
-        #     try:
-        #         query = tracklist[i] + " " + tracklist[i+1]
-        #         query = query.replace("&", "+")
-        #         query = query.replace(" ", "+")
-        #         query = query.replace(",", "+")
-        #         query = query.replace("+-+", "+")
-        #         query = query.replace("++", "+")
-        #         querylist.append(query)
-        #         i += 2
-        #     except: break
-
-        # playlist_name = self.get_playlist_name(spotify_link)
-        # playlist_name = playlist_name.replace("&", "and")
-        # # Load progress
-        # if playlist_name in self.progress_dict.keys():
-        #     playlist_id = self.progress_dict[playlist_name]["playlist_id"]
-        #     querys_done = self.progress_dict[playlist_name]["querys_done"]
         # else:
         #     playlist_id = self.yt_api.create_playlist(playlist_name)["id"]
         #     self.progress_dict[playlist_name] = {"playlist_id": playlist_id, "querys_done": {}}
