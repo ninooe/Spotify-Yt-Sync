@@ -1,29 +1,39 @@
 import sqlite3
 from sqlite3 import Error
-from sqlite3.dbapi2 import Connection
+from sqlite3.dbapi2 import Connection, Cursor
 import logging
-
+import sys
 import yaml
-try:
-    from yaml import CLoader as Loader, CDumper as Dumper
-except ImportError:
-    from yaml import Loader, Dumper
 
 
 class Sqlite_handler():
 
-    def __init__(self, database_file:str) -> None:
+    def __init__(self, database_file:str = "progress.sqlite") -> None:
 
         self.logger = logging.getLogger(__name__)
         self.conn: Connection = self.load_database(database_file)
 
         self.sql_schema = self.load_schema("sqlite_schema.yaml")
+        if not self.table_exists("PLAYLISTS"):
+            self.create_table_from_preset("PLAYLISTS", "PLAYLISTS")
 
+        
+    # def add_cursor(func):s
+    #     def wrap(self, *args, **kwargs) :
+    #         with self.conn.cursor() as cursor:
+    #             kwargs["cursor"] = cursor
+    #             return func(self,  *args, **kwargs)
+    #     return wrap
 
+    def table_exists(self, table_name) -> bool:
+        cursor = self.q_exec(f'''SELECT count(name) FROM sqlite_master WHERE type='table' AND name='{table_name}';''')
+        if cursor.fetchone()[0]==1: 
+            return True
+        return False
 
     def load_schema(self, path:str) -> dict:
         with open(path, "r") as file:
-            return yaml.load(file, Loader)
+            return yaml.load(file, Loader=yaml.FullLoader)
 
     def load_database(self, path:str) -> Connection:
         connection = None
@@ -39,36 +49,17 @@ class Sqlite_handler():
         self.conn.close()
 
     
-    def create_table_query_from_dict(self, schema:dict) -> str:
-        name = next(iter(schema))
-        columns = schema[name]
+    def create_table_from_preset(self, preset:str, tablename:str) -> str:
+        columns = self.sql_schema['TABLES'][preset]
         column_querys = ", ".join([f"{key} {struct}" for key, struct in columns.items()])
-        return  f"CREATE TABLE {name}({column_querys});"
-
+        self.conn.execute(f"CREATE TABLE {tablename}({column_querys});")
+        self.conn.commit()
 
     def q_exec(self, query: str):
-        cur = self.conn.cursor()
-        cur.execute(query)
-
-        # return self.conn.execute(query)
-
-    def q_(self, query: str):
         cursor = self.conn.cursor()
         cursor.execute(query)
-        return cursor.fetchall()
-
-
-# sql = Sqlite_handler()
-# test = {
-#   "PLAYLISTS":{
-#     "ID": "INT PRIMARY KEY NOT NULL",
-#     "NAME": "VARCHAR(100) NOT NULL",
-#     "CREATOR": "VARCHAR(100)",
-#     "SPOTIFY_LINK": "VARCHAR(100)"}}
-
-# sql.q_exec(sql.create_table_query_from_dict(test))
-
-# sql.close_conn()
+        self.conn.commit()
+        return cursor
 
 
         

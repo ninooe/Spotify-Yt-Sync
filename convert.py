@@ -102,13 +102,12 @@ class Yt_sptfy_converter:
 
 
         linklists = [get_playlist_links(config["sync_links"][entry]) for entry in config["sync_links"]]
-        linklist = list(set([item for sublist in linklists for item in sublist]))
+        linklist = list(set([item for sublist in linklists if sublist for item in sublist]))
 
         for link in linklist:
             name = self.get_playlist_name(link)
-            print(name, link)
             self.sql.q_exec(f"INSERT INTO PLAYLISTS (NAME,SPOTIFY_LINK) \
-                            VALUES ('that','this')")
+                        VALUES ('{name}','{link}')")
                             # VALUES ({name},'{link}');")
             # self.sql.q_exec(f"VALUES ({name}, {link});")
 
@@ -285,4 +284,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-# %%
