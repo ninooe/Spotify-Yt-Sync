@@ -80,18 +80,29 @@ class Yt_sptfy_converter:
         #     self.pw = getpass('Password: ')
         # self.open_spotify_session()
 
-
-        for entry in config["sync_links"]:
-            link = config["sync_links"][entry]
+        # def sync_user_profile(profile_link) -> list[str]:
+        #     return [link for link in self.get_playlistlinks_from_profile(profile_link)]
+        
+        def get_playlist_links(raw_link) -> list[str]:
             # Remove quotation if given in config
             re_subs = [(r"^'''", ""), (r"^\"", ""), (r"^'", ""), (r"'''$", ""), (r"\"$", ""), (r"'$", "")]
-            link = self.re_sub_list(link, re_subs)
-            if re.search(r"^https://open.spotify.com/user/", link):
-                self.sync_user_profile(link)
-            if re.search(r"^https://open.spotify.com/playlist/", link):
-                self.convert_playlist(link)
-            else: 
-                logging.info(f'{link} did not match user or playlist regex')
+            raw_link = self.re_sub_list(raw_link, re_subs)
+            if re.search(r"^https://open.spotify.com/playlist/", raw_link):
+                return [raw_link]
+            if re.search(r"^https://open.spotify.com/user/", raw_link):
+                return self.get_playlistlinks_from_profile(raw_link)
+                # return [get_playlist_links(link) for link in sync_user_profile(raw_link)]
+            logging.info(f'{raw_link} did not match user or playlist regex')
+
+
+        linklists = [get_playlist_links(config["sync_links"][entry]) for entry in config["sync_links"]]
+        linklist = list(set([item for sublist in linklists for item in sublist]))
+        logging.error(linklist)
+        
+        
+
+        
+
 
     @staticmethod
     def re_sub_list(string_to_edit:str, regex_list:list[(str, str), ]) -> str:
@@ -234,43 +245,19 @@ class Yt_sptfy_converter:
     def get_playlist_name(self, spotify_link):
         try:
             self.driver.get(spotify_link)
-            name = WebDriverWait(self.driver, 30).until(
-                EC.presence_of_element_located((By.CLASS_NAME, '''a12b67e576d73f97c44f1f37026223c4-scss'''))
-            )
-            return name.text
+            return wait_for_element(By.CLASS_NAME, '''a12b67e576d73f97c44f1f37026223c4-scss''', self.driver).text
         except:
             return self.get_playlist_name(spotify_link)
 
 
-    def get_playlistlinks_from_profile(self, profile_link):
+    def get_playlistlinks_from_profile(self, profile_link) -> list[str]:
 
-        self.driver.get(profile_link)
-        # profileIcon = WebDriverWait(self.driver, 30).until(
-        #     EC.presence_of_element_located((By.CLASS_NAME, '''_3e75c7f07bdce28b37b45a5cd74ff371-scss'''))
-        # )
-        # profileIcon.click()
-        # profileButton = self.driver.find_element_by_xpath('''//*[@id="context-menu"]/div/ul/li[2]/a''')
-        # linktext = profileButton.get_attribute('href')
         link_to_playlists = profile_link + "/playlists"
         self.driver.get(link_to_playlists)
 
-        playlists_field = WebDriverWait(self.driver, 30).until(
-            EC.presence_of_element_located((By.XPATH, '''//*[@id="main"]/div/div[2]/div[3]/main/div[2]/div[2]/div/div/div[2]/section/section/div[2]'''))
-        )
-
-        playlist_linklist = []
+        playlists_field = wait_for_element(By.XPATH, '''//*[@id="main"]/div/div[2]/div[3]/main/div[2]/div[2]/div/div/div[2]/section/section/div[2]''', self.driver)
         list_link_objects = playlists_field.find_elements_by_tag_name('a')
-        for item in list_link_objects:
-            href = item.get_attribute('href')
-            playlist_linklist.append(href)
-        return playlist_linklist
-
-
-    def sync_user_profile(self, profile_link):
-    
-        for playlist_link in self.get_playlistlinks_from_profile(profile_link):
-            self.convert_playlist(playlist_link)
-
+        return [item.get_attribute('href') for item in list_link_objects]
         
 
 

@@ -29,6 +29,13 @@ class Sqlite_handler():
         self.conn.commit()
         self.conn.close()
 
+    
+    def create_table_query_from_dict(self, schema:dict) -> str:
+        name = next(iter(schema))
+        columns = schema[name]
+        column_querys = ", ".join([f"{key} {struct}" for key, struct in columns.items()])
+        return  f"CREATE TABLE {name}({column_querys});"
+
 
     def q_exec(self, query: str):
         return self.conn.execute(query)
@@ -38,17 +45,18 @@ class Sqlite_handler():
         cursor.execute(query)
         return cursor.fetchall()
 
-    def reset_tables():
-        pass
 
+# sql = Sqlite_handler()
+# test = {
+#   "PLAYLISTS":{
+#     "ID": "INT PRIMARY KEY NOT NULL",
+#     "NAME": "VARCHAR(100) NOT NULL",
+#     "CREATOR": "VARCHAR(100)",
+#     "SPOTIFY_LINK": "VARCHAR(100)"}}
 
-sql = Sqlite_handler()
-sql.q_exec('''CREATE TABLE PLAYLISTS (
-    ID INT PRIMARY KEY NOT NULL,
-    NAME VARCHAR(100) NOT NULL,
-    CREATOR VARCHAR(100) NULL,
-    SPOTIFY_LINK VARCHAR(100) NOT NULL);''')
-sql.close_conn()
+# sql.q_exec(sql.create_table_query_from_dict(test))
+
+# sql.close_conn()
 
 
         
