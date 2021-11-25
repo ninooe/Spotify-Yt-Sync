@@ -5,6 +5,7 @@ import logging
 import sys
 from typing import Iterable
 import yaml
+from yaml.error import YAMLError
 
 
 class Sqlite_handler():
@@ -34,7 +35,7 @@ class Sqlite_handler():
             return True
         return False
 
-    def fetchall(self, values:str = "*", table_name:str="sqlite_master", condition:str=None) -> list:
+    def fetchall(self, values:str = "*", table_name:str="sqlite_master", condition:str=None) -> list[tuple]:
         query = f'''SELECT {values} FROM {table_name}{f' WHERE {condition};' if condition else ';'}'''
         self.logger.error(f"{query=}")
         cursor = self.q_exec(query)
@@ -42,7 +43,10 @@ class Sqlite_handler():
 
     def load_schema(self, path:str) -> dict:
         with open(path, "r") as file:
-            return yaml.load(file, Loader=yaml.FullLoader)
+            try:
+                return yaml.load(file, Loader=yaml.FullLoader)
+            except (YAMLError):
+                self.logger.error(f'failed to load yaml {path=}')
 
     def load_database(self, path:str) -> Connection:
         connection = None

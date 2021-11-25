@@ -94,12 +94,10 @@ class Yt_sptfy_converter:
         for link in links_in_conf: 
             self.import_link(link) 
 
-        # linklist = list(set([item for sublist in linklists_raw if sublist for item in sublist]))
 
 
 
-
-    def import_link(self, raw_link:str):
+    def import_link(self, spotify_link:str):
 
         def get_playlist_links(raw_link) -> list[str]:
             # Remove quotation if given in config
@@ -113,13 +111,11 @@ class Yt_sptfy_converter:
             logging.info(f'{raw_link} did not match user or playlist regex')
 
         # parse links
-        linklist = get_playlist_links(raw_link)
+        linklist = get_playlist_links(spotify_link)
         # add to playlists to db if not present
         links_in_db = [link[0] for link in self.sql.fetchall("sp_link", "Playlists")]
         links_to_add = [(link,) for link in linklist if not link in links_in_db]
         self.sql.q_exec_many("INSERT INTO Playlists (sp_link) VALUES (?)", links_to_add)
-
-
 
 
     def update_playlist_name(self, spotify_link:str):
@@ -142,7 +138,14 @@ class Yt_sptfy_converter:
         return string_to_edit
 
 
-    def get_tracks_and_artists(self, spotify_link) -> list[(str, str), ]:
+    def get_tracks_and_artists(self, spotify_link:str) -> list[(str, str), ]:
+        """
+        Args:
+            spotify_link (str): spotify webplayer link to playlist
+
+        Returns:
+            list[(str, str), ]: list of tuples containing (title, artits) of tracks in playlist
+        """
         
         self.driver.get(spotify_link)
         parentElement = wait_for_element(By.XPATH, '''//*[@id="main"]/div/div[2]/div[3]/main/div[2]/div[2]/div/div/div[2]/section/div[2]/div[3]/div[1]''', self.driver)
@@ -277,7 +280,6 @@ class Yt_sptfy_converter:
 
         link_to_playlists = profile_link + "/playlists"
         self.driver.get(link_to_playlists)
-
         playlists_field = wait_for_element(By.XPATH, '''//*[@id="main"]/div/div[2]/div[3]/main/div[2]/div[2]/div/div/div[2]/section/section/div[2]''', self.driver)
         list_link_objects = playlists_field.find_elements_by_tag_name('a')
         return [item.get_attribute('href') for item in list_link_objects]
