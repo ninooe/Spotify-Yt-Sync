@@ -16,28 +16,20 @@ class Sqlite_handler():
         self.conn: Connection = self.load_database(database_file)
 
         self.sql_schema = self.load_schema("sqlite_schema.yaml")
+        # create default tables if not present
         if not self.entry_exists("type='table' AND name='Playlists'"):
             self.create_table_from_preset("Playlists", "Playlists")
 
-        
-    # def add_cursor(func):s
-    #     def wrap(self, *args, **kwargs) :
-    #         with self.conn.cursor() as cursor:
-    #             kwargs["cursor"] = cursor
-    #             return func(self,  *args, **kwargs)
-    #     return wrap
 
     def entry_exists(self, condition:str, table_name:str="sqlite_master") -> bool:
         query = f'''SELECT count(name) FROM {table_name} WHERE {condition};'''
-        self.logger.error(f"{query=}")
         cursor = self.q_exec(query)
         if cursor.fetchone()[0]==1: 
             return True
-        return False
+        return False    
 
     def fetchall(self, values:str = "*", table_name:str="sqlite_master", condition:str=None) -> list[tuple]:
         query = f'''SELECT {values} FROM {table_name}{f' WHERE {condition};' if condition else ';'}'''
-        self.logger.error(f"{query=}")
         cursor = self.q_exec(query)
         return cursor.fetchall()
 
@@ -61,7 +53,6 @@ class Sqlite_handler():
         self.conn.commit()
         self.conn.close()
     
-    
     def create_table_from_preset(self, preset:str, tablename:str) -> str:
         columns = self.sql_schema['Tables'][preset]
         column_querys = ", ".join([f"{key} {struct}" for key, struct in columns.items()])
@@ -70,12 +61,14 @@ class Sqlite_handler():
 
     def q_exec(self, query: str):
         cursor = self.conn.cursor()
+        self.logger.error(f"{query=}")
         cursor.execute(query)
         self.conn.commit()
         return cursor
 
     def q_exec_many(self, query: str, iter_params:Iterable):
         cursor = self.conn.cursor()
+        self.logger.error(f"{query=}, {iter_params=}")
         cursor.executemany(query, iter_params)
         self.conn.commit()
         return cursor

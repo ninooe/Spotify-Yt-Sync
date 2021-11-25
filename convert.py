@@ -76,6 +76,7 @@ class Yt_sptfy_converter:
         self.driver = initialize_chromedriver()
         
 
+
         # # Connect to spotify account
         # # Get Spotify Credentials
         # self.loginName = config["spotify"]["accountNameOrEmail"]
@@ -90,9 +91,11 @@ class Yt_sptfy_converter:
         
 
 
-        links_in_conf = [config["sync_links"][entry] for entry in config["sync_links"]]
-        for link in links_in_conf: 
-            self.import_link(link) 
+        # add all links in config to db if not present
+        map(self.import_link, [config["sync_links"][entry] for entry in config["sync_links"]])
+        # update playlistnames in db
+        map(self.update_playlist_name, [link[0] for link in self.sql.fetchall("sp_link", "Playlists")])
+        
 
 
 
@@ -120,6 +123,7 @@ class Yt_sptfy_converter:
 
     def update_playlist_name(self, spotify_link:str):
         name = self.get_playlist_name(spotify_link)
+        self.sql.q_exec(f"UPDATE Playlists SET name = '{name}' WHERE sp_link = '{spotify_link}")
         
 
     @staticmethod
