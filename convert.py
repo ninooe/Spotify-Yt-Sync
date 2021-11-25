@@ -89,6 +89,18 @@ class Yt_sptfy_converter:
         #     return [link for link in self.get_playlistlinks_from_profile(profile_link)]
         
 
+
+        links_in_conf = [config["sync_links"][entry] for entry in config["sync_links"]]
+        for link in links_in_conf: 
+            self.import_link(link) 
+
+        # linklist = list(set([item for sublist in linklists_raw if sublist for item in sublist]))
+
+
+
+
+    def import_link(self, raw_link:str):
+
         def get_playlist_links(raw_link) -> list[str]:
             # Remove quotation if given in config
             re_subs = [(r"^'''", ""), (r"^\"", ""), (r"^'", ""), (r"'''$", ""), (r"\"$", ""), (r"'$", "")]
@@ -100,20 +112,18 @@ class Yt_sptfy_converter:
                 # return [get_playlist_links(link) for link in sync_user_profile(raw_link)]
             logging.info(f'{raw_link} did not match user or playlist regex')
 
-
-        linklists = [get_playlist_links(config["sync_links"][entry]) for entry in config["sync_links"]]
-        linklist = list(set([item for sublist in linklists if sublist for item in sublist]))
-
-        for link in linklist:
-            name = self.get_playlist_name(link)
-            self.sql.q_exec(f"INSERT INTO PLAYLISTS (NAME,SPOTIFY_LINK) \
-                        VALUES ('{name}','{link}')")
-                            # VALUES ({name},'{link}');")
-            # self.sql.q_exec(f"VALUES ({name}, {link});")
+        # parse links
+        linklist = get_playlist_links(raw_link)
+        # add to playlists to db if not present
+        links_in_db = [link[0] for link in self.sql.fetchall("sp_link", "Playlists")]
+        links_to_add = [(link,) for link in linklist if not link in links_in_db]
+        self.sql.q_exec_many("INSERT INTO Playlists (sp_link) VALUES (?)", links_to_add)
 
 
-            
-                
+
+
+    def update_playlist_name(self, spotify_link:str):
+        name = self.get_playlist_name(spotify_link)
         
 
     @staticmethod
