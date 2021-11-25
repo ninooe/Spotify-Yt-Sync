@@ -89,12 +89,10 @@ class Yt_sptfy_converter:
         # def sync_user_profile(profile_link) -> list[str]:
         #     return [link for link in self.get_playlistlinks_from_profile(profile_link)]
         
-
-
         # add all links in config to db if not present
-        map(self.import_link, [config["sync_links"][entry] for entry in config["sync_links"]])
+        list(map(self.import_link, [config["sync_links"][entry] for entry in config["sync_links"]]))
         # update playlistnames in db
-        map(self.update_playlist_name, [link[0] for link in self.sql.fetchall("sp_link", "Playlists")])
+        list(map(self.update_playlist_name, [link[0] for link in self.sql.fetchall("sp_link", "Playlists")]))
         
 
 
@@ -123,7 +121,7 @@ class Yt_sptfy_converter:
 
     def update_playlist_name(self, spotify_link:str):
         name = self.get_playlist_name(spotify_link)
-        self.sql.q_exec(f"UPDATE Playlists SET name = '{name}' WHERE sp_link = '{spotify_link}")
+        self.sql.q_exec(f"UPDATE Playlists SET name = '{name}' WHERE sp_link = '{spotify_link}'")
         
 
     @staticmethod
