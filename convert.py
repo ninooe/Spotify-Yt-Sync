@@ -110,7 +110,7 @@ class Yt_sptfy_converter:
         self.sql.create_table_from_preset('Playlist_template', t_name)
         # for track, artist in self.get_tracks_and_artists(spotify_link):S
         tracks_artists = self.get_tracks_and_artists(spotify_link)
-        new_too_add = [(tr, at) for tr, at in tracks_artists if not self.sql.entry_exists(f'track="{tr}" AND artists = "{at}"', t_name)]
+        new_too_add = [(tr, at) for tr, at in tracks_artists if not self.sql.get_entry_count(f'track="{tr}" AND artists = "{at}"', t_name)]
         self.sql.q_exec_many(f"INSERT INTO {t_name} (track, artists) VALUES (?, ?)", new_too_add)
 
     def import_link(self, spotify_link:str):

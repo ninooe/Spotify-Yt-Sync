@@ -20,12 +20,10 @@ class Sqlite_handler():
         self.create_table_from_preset("Playlists", "Playlists")
 
 
-    def entry_exists(self, condition:str, table_name:str="sqlite_master") -> bool:
+    def get_entry_count(self, condition:str, table_name:str="sqlite_master") -> int:
         query = f'''SELECT count(*) FROM {table_name} WHERE {condition};'''
         cursor = self.q_exec(query)
-        if not cursor.fetchone()[0]==0: 
-            return True
-        return False    
+        return cursor.fetchone()[0]
 
     def fetchall(self, values:str = "*", table_name:str="sqlite_master", condition:str=None) -> list[tuple]:
         query = f'''SELECT {values} FROM {table_name}{f' WHERE {condition};' if condition else ';'}'''
@@ -53,7 +51,7 @@ class Sqlite_handler():
         self.conn.close()
     
     def create_table_from_preset(self, preset:str, tablename:str) -> str:
-        if self.entry_exists(f"type='table' AND name='{tablename}'"):
+        if self.get_entry_count(f"type='table' AND name='{tablename}'"):
             self.logger.info(f"did not create {tablename}, already present")
             return
         columns = self.sql_schema['Tables'][preset]
