@@ -1,7 +1,6 @@
 import datetime
 from getpass import getpass
 import os
-from os import name
 import sys
 import re
 import time
@@ -34,6 +33,8 @@ class Yt_sptfy_converter:
         # _ = self.yt_api.get_user_channel()['items'][0]["id"]
 
         self.logger = logging.getLogger(__name__)
+        logging.basicConfig(filename='scripttest.log', encoding='utf-8', level=logging.INFO)
+
 
         # Read Configfile
         configfile = "config.ini"
@@ -44,6 +45,8 @@ class Yt_sptfy_converter:
 
         self.debugmode = False
 
+        
+
         # # Load progress tracker
         # self.path_to_progress_json = "./progress.json"
         # try:
@@ -51,6 +54,8 @@ class Yt_sptfy_converter:
         #         self.progress_dict = json.load(f)
         # except:
         #     self.progress_dict = {}
+
+       
 
 
         def initialize_chromedriver() -> webdriver.Chrome:
@@ -61,6 +66,7 @@ class Yt_sptfy_converter:
             options.add_argument("--enable-webgl")
             options.add_experimental_option('excludeSwitches', ['enable-automation'])
             if not self.debugmode: 
+                options.add_argument('log-level=2')
                 options.add_argument("--headless") 
             driver = webdriver.Chrome(options=options)
 
@@ -91,12 +97,21 @@ class Yt_sptfy_converter:
         
         # add all links in config to db if not present
         list(map(self.import_link, [config["sync_links"][entry] for entry in config["sync_links"]]))
-        # update playlistnames in db
-        list(map(self.update_playlist_name, [link[0] for link in self.sql.fetchall("sp_link", "Playlists")]))
+        # # update playlistnames in db
+        sp_links_in_db = [link[0] for link in self.sql.fetchall("sp_link", "Playlists")]
+        list(map(self.update_playlist_name, sp_links_in_db))
+        self.import_playlist(sp_links_in_db[0])
         
 
-
-
+    def import_playlist(self, spotify_link:str):
+        
+        pk = self.sql.fetchall('id', 'Playlists', f"sp_link = '{spotify_link}'")[0][0]
+        t_name = f'Playlist_{pk}'
+        self.sql.create_table_from_preset('Playlist_template', t_name)
+        # for track, artist in self.get_tracks_and_artists(spotify_link):S
+        tracks_artists = self.get_tracks_and_artists(spotify_link)
+        new_too_add = [(tr, at) for tr, at in tracks_artists if not self.sql.entry_exists(f'track="{tr}" AND artists = "{at}"', t_name)]
+        self.sql.q_exec_many(f"INSERT INTO {t_name} (track, artists) VALUES (?, ?)", new_too_add)
 
     def import_link(self, spotify_link:str):
 
@@ -119,13 +134,13 @@ class Yt_sptfy_converter:
         self.sql.q_exec_many("INSERT INTO Playlists (sp_link) VALUES (?)", links_to_add)
 
 
-    def update_playlist_name(self, spotify_link:str):
+    def update_playlist_name(self, spotify_link:str):  
         name = self.get_playlist_name(spotify_link)
-        self.sql.q_exec(f"UPDATE Playlists SET name = '{name}' WHERE sp_link = '{spotify_link}'")
-        
+        self.sql.q_exec(f"UPDATE Playlists SET name = ? WHERE sp_link = ?", (name, spotify_link))
+
 
     @staticmethod
-    def re_sub_list(string_to_edit:str, regex_list:list[(str, str), ]) -> str:
+    def re_sub_list(string_to_edit: str, regex_list: list[(str, str), ]) -> str:
         """funktion that will repeatedly will call re.sub and return endresult
 
         Args:
@@ -140,7 +155,7 @@ class Yt_sptfy_converter:
         return string_to_edit
 
 
-    def get_tracks_and_artists(self, spotify_link:str) -> list[(str, str), ]:
+    def get_tracks_and_artists(self, spotify_link: str) -> list[(str, str), ]:
         """
         Args:
             spotify_link (str): spotify webplayer link to playlist
@@ -158,7 +173,7 @@ class Yt_sptfy_converter:
         while True:
             # Wait for page to load
             time.sleep(0.5)
-            found_elements = parentElement.find_elements_by_css_selector('''div[role='row']''')
+            found_elements = parentElement.find_elements(By.CSS_SELECTOR, '''div[role='row']''')
             new_elements = [elem for elem in found_elements if not elem in subElementList]
             subElementList.extend(new_elements)
             # if new elements are found scroll to last element 
@@ -172,10 +187,10 @@ class Yt_sptfy_converter:
             lines: list[str] = element.text.splitlines()
             # the structure of lines:
             # ['title', (optional 'E' tag), 'artist', 'album', 'time_since_added_to_playlist', 'duration']
-            if lines[1] == 'E':
-                tracklist.append((lines[0], lines[2]))
+            if lines[2] == 'E':
+                tracklist.append((lines[1], lines[3]))
             else:
-                tracklist.append((lines[0], lines[1]))
+                tracklist.append((lines[1], lines[2]))
 
         return tracklist
 
@@ -277,16 +292,28 @@ class Yt_sptfy_converter:
             self.logger.error("could not find playlist name, classname of element might be deprecated!")
             return self.get_playlist_name(spotify_link)
 
+    
+    def get_playlist_creator():
+        pass
+
 
     def get_playlistlinks_from_profile(self, profile_link) -> list[str]:
 
         link_to_playlists = profile_link + "/playlists"
         self.driver.get(link_to_playlists)
         playlists_field = wait_for_element(By.XPATH, '''//*[@id="main"]/div/div[2]/div[3]/main/div[2]/div[2]/div/div/div[2]/section/section/div[2]''', self.driver)
-        list_link_objects = playlists_field.find_elements_by_tag_name('a')
+        list_link_objects = playlists_field.find_elements(By.TAG_NAME, 'a')
         return [item.get_attribute('href') for item in list_link_objects]
         
-
+    # onyl conceptual for now
+    def terminal_controller(self):
+        print('Terminal controller, ')
+        while True:
+            command = input("type help for options exit to exit")
+            if command == "exit":
+                sys.exit()
+            if command == "help":
+                print("will be added another day")
 
 def main():
 

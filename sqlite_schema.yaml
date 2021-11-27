@@ -2,12 +2,24 @@
 Tables:
   Playlists:
     ID: INTEGER PRIMARY KEY NOT NULL
-    name: VARCHAR(100)
-    creator: VARCHAR(100)
-    sp_link: VARCHAR(100) NOT NULL
+    name: TEXT
+    creator: TEXT
+    sp_link: TEXT NOT NULL
+    yt_link: TEXT
 
-  PLAYLIST_TEMPLATE:
-    ID: INT PRIMARY KEY NOT NULL AUTO_INCREMENT
-    track: VARCHAR(50)
-    artist: VARCHAR(50)
-    yt_link: VARCHAR(200)
+  # Playlists:
+  #   ID: INT PRIMARY KEY NOT NULL
+  #   name: VARCHAR(100)
+  #   creator: VARCHAR(100)
+  #   sp_link: VARCHAR(100) NOT NULL
+  #   yt_link: VARCHAR(200)
+
+  Playlist_template:
+    ID: INTEGER PRIMARY KEY NOT NULL
+    track: TEXT
+    artists: TEXT
+    yt_link: TEXT
+
+  # Artist:
+  #   ID: INTEGER PRIMARY KEY NOT NULL
+  #   name: VARCHAR(100)
