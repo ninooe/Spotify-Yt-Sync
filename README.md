@@ -14,11 +14,11 @@ Setup:
 local commands:
 ```powershell
 # setup virtual-environment
-python3 -m venv /path/to/your/new/virtual-env
+python3 -m venv virtual-env
 # install requirements in the virtual-environmen
-/path/to/your/new/virtual-env/Scripts/python -m pip install -r /path/to/requirements.txt
+/path/to/your/new/virtual-env/Scripts/python -m pip install -r requirements.txt
 # command to start the script
-/path/to/your/new/virtual-env/Scripts/python /path/to/convert.py
+/path/to/your/new/virtual-env/Scripts/python convert.py
 ```
 additional steps:
 https://www.youtube.com/watch?v=HzICUriU3k0&ab_channel=JieJenn

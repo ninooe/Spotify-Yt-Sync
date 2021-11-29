@@ -19,9 +19,10 @@ class Yt_api:
         
         self.client_secrets_path = r'client_secret.json'
         self.path_to_token = "token.pickle"
+        self.logger = logging.getLogger(__name__)
+        
         self.serviceYT = build("youtube", "v3", credentials=self.load_credentials())
 
-        self.logger = logging.getLogger(__name__)
         
     def load_credentials(self):
 
