@@ -1,0 +1,25 @@
+# SQL table presets for easy editing
+Tables:
+  Playlists:
+    ID: INTEGER PRIMARY KEY NOT NULL
+    name: TEXT
+    creator: TEXT
+    sp_link: TEXT NOT NULL
+    yt_link: TEXT
+
+  # Playlists:
+  #   ID: INT PRIMARY KEY NOT NULL
+  #   name: VARCHAR(100)
+  #   creator: VARCHAR(100)
+  #   sp_link: VARCHAR(100) NOT NULL
+  #   yt_link: VARCHAR(200)
+
+  Playlist_template:
+    ID: INTEGER PRIMARY KEY NOT NULL
+    track: TEXT
+    artists: TEXT
+    yt_id: TEXT
+
+  # Artist:
+  #   ID: INTEGER PRIMARY KEY NOT NULL
+  #   name: VARCHAR(100)

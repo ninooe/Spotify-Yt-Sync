@@ -1,0 +1,6 @@
+[spotify]
+accountNameOrEmail = 
+password = 
+
+[sync_links] #Add keys in str
+link1 = 
