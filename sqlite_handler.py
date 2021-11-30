@@ -25,11 +25,6 @@ class Sqlite_handler():
         cursor = self.q_exec(query, sqlvars)
         return cursor.fetchone()[0]
 
-    def fetchall(self, values:str = "*", table_name:str="sqlite_master", condition:str=None) -> list[tuple]:
-        query = f'''SELECT {values} FROM {table_name}{f' WHERE {condition};' if condition else ';'}'''
-        cursor = self.q_exec(query)
-        return cursor.fetchall()
-
     def load_schema(self, path:str) -> dict:
         with open(path, "r") as file:
             try:

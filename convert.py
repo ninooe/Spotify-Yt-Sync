@@ -1,5 +1,6 @@
 import datetime
 from getpass import getpass
+from inspect import _void
 import os
 import sys
 import re
@@ -14,6 +15,7 @@ from selenium.webdriver.support import expected_conditions as EC, select
 from selenium.webdriver.support.ui import Select, WebDriverWait
 from selenium.webdriver.common.keys import Keys
 from selenium.webdriver.common.action_chains import ActionChains
+from six import viewitems, viewkeys
 
 from yt_api import *
 from selenium_helper import *
@@ -86,7 +88,7 @@ class Yt_sptfy_converter:
         # add all links in config to db if not present
         list(map(self.import_link, [config["sync_links"][entry] for entry in config["sync_links"]]))
         # # update playlistnames in db
-        sp_links_in_db = [link[0] for link in self.sql.fetchall("sp_link", "Playlists")]
+        sp_links_in_db = [link[0] for link in self.sql.q_exec('SELECT sp_link FROM Playlists').fetchall()]
         list(map(self.update_playlist_name, sp_links_in_db))
         for link in sp_links_in_db:
             self.update_playlist(link)
@@ -104,27 +106,24 @@ class Yt_sptfy_converter:
         t_name = f'Playlist_{pk}'
         self.sql.create_table_from_preset('Playlist_template', t_name)
         # get entrys in db
-        db_entrys = self.sql.fetchall(values='ID,track,artists', table_name=t_name)
+        db_entrys = self.sql.q_exec(f'SELECT ID, track, artists FROM {t_name}').fetchall()
         # get entrys in spotify
         tracks_artists = self.get_tracks_and_artists(spotify_link)
         # list for items to be removed from db and yt_playlist
         self.remove_tracks(t_name, tuple(id for id, tr, at in db_entrys if (tr, at) not in tracks_artists))
-
-
-        # old_too_remove = [(tr, ar, yt_id) for tr, ar in db_entrys if (tr, ar) not in tracks_artists]
-
-
-        # # list(map(self.yt_api.delete_item_from_playlist([yt_id for _, _, yt_id in old_too_remove])))
-        # self.sql.q_exec_many(f"DELETE FROM {t_name} WHERE track=? AND artists=?", [(tr, at) for tr, at, _ in old_too_remove])
-        # # list for entrys that will be added to db and yt_playlist
+        # list of items to be added to db and spotify
         new_too_add = [(tr, at) for tr, at in tracks_artists if not self.sql.get_entry_count(f'track=? AND artists=?', t_name, (tr, at))]
+        # add tracks to db
+        self.sql.q_exec_many(f'INSERT INTO {t_name} (track, artists) VALUES (?, ?)', new_too_add)
+        # start sync with youtube
+        self.sync_tracks_yt(pk)
+
+        
 
 
 
-        # self.convert_playlist(spotify_link)
 
-
-    def import_link(self, spotify_link:str):
+    def import_link(self, spotify_link: str):
 
         def get_playlist_links(raw_link) -> list[str]:
             # Remove quotation if given in config
@@ -140,26 +139,19 @@ class Yt_sptfy_converter:
         # parse links
         linklist = get_playlist_links(spotify_link)
         # add to playlists to db if not present
-        links_in_db = [link[0] for link in self.sql.fetchall("sp_link", "Playlists")]
+        links_in_db = [link[0] for link in self.sql.q_exec('SELECT sp_link FROM Playlists').fetchall()]
         links_to_add = [(link,) for link in linklist if not link in links_in_db]
         self.sql.q_exec_many("INSERT INTO Playlists (sp_link) VALUES (?)", links_to_add)
 
 
-    def add_tracks(self, pk: int, keys: tuple):
-        if len(keys) == 1:
-            add = self.sql.q_exec(f'SELECT ID, track, artist FROM Playlist_{pk} WHERE ID = ?', (keys[0],)).fetchall()
-        else:
-            add = self.sql.q_exec(f'SELECT ID, track, artist FROM Playlist_{pk} WHERE ID IN {keys}').fetchall()
-        self.get_yt_id_from_keywords()
-        tracks_too_add: list[(int, str, str), ]
+    def sync_tracks_yt(self, pk: int):
+        add = self.sql.q_exec(f'SELECT track, artists FROM Playlist_{pk} WHERE yt_id IS NULL').fetchall()
+        playlist_id: str = self.sql.q_exec(f'SELECT yt_id FROM Playlists WHERE ID = ?', (pk,)).fetchone()[0]
         for tr, at in add:
             vid_id = self.get_yt_id_from_keywords([tr, at])
-            yt_id = self.yt_api.add_item_to_playlist(playlist_id, )
-            tracks_too_add.append
-        yt_ids = [self.get_yt_id_from_keywords([tr, at])) for _, tr, at in add]
-        insert = tuple(tr, at, 
-        self.sql.q_exec_many(f"INSERT INTO Playlist_{pk} (track, artists, yt_id) VALUES (?, ?, ?)", new_too_add)
-        pass
+            if not vid_id: continue
+            yt_id = self.yt_api.add_item_to_playlist(playlist_id, vid_id)["id"]
+            self.sql.q_exec(f"UPDATE Playlist_{pk} SET yt_id = ? WHERE track = ? AND artists = ?", (yt_id, tr, at))
 
 
     def remove_tracks(self, tablename: str, keys: tuple):
@@ -168,7 +160,7 @@ class Yt_sptfy_converter:
         else:
             remove = self.sql.q_exec(f'SELECT ID, yt_id FROM {tablename} WHERE ID IN {keys}').fetchall()
         self.sql.q_exec_many(f"DELETE FROM {tablename} WHERE ID = ?", [(id,) for id, _ in remove])
-        list(map(self.yt_api.delete_item_from_playlist, [yt_id for _, yt_id in remove]))
+        list(map(self.yt_api.delete_item_from_playlist, [yt_id for _, yt_id in remove if yt_id]))
 
 
     def update_playlist_name(self, spotify_link:str):  
@@ -198,11 +190,11 @@ class Yt_sptfy_converter:
             spotify_link (str): spotify webplayer link to playlist
 
         Returns:
-            list[(str, str), ]: list of tuples containing (title, artits) of tracks in playlist
+            list[(str, str),]: list of tuples containing (title, artits) of tracks in playlist
         """
         
         tracklist: list[(str, str),] = []
-
+            
         self.driver.get(spotify_link)
         parentElement = wait_for_element(By.XPATH, '''//*[@id="main"]/div/div[2]/div[3]/main/div[2]/div[2]/div/div/div[2]/section/div[2]/div[3]/div[1]''', self.driver)
         if not parentElement:
@@ -266,70 +258,28 @@ class Yt_sptfy_converter:
         if not (resultlist := wait_for_element(By.XPATH, '''//*[@id="page-manager"]/ytd-search''', self.driver, timeout=30)):
             return False
 
-        # filter what should be excluded from links
-        raw_list = [r"&list=", r"[Clean]", r"[clean]"]
-        reg_list = map(re.compile, raw_list)
         # search for valid link
-        for link in resultlist.find_elements_by_tag_name('a'):
+        for link in resultlist.find_elements(By.TAG_NAME, 'a'):
             href = str(link.get_attribute('href'))
-            if not href is None and re.search(r"^https://www.youtube.com/watch", href):
-                if not any(regex.match(href) for regex in reg_list): 
-                    return(href)
+            if not href is None and re.search(r"^https://www.youtube.com/watch", href) and not re.match(r"\&list=", href):
+                print(link)
+                # add filter for r"[Clean]", r"[clean]"
+                return(href)
+        self.logger.error(f"no video found for {query=}")
         return ""
 
-    ########################## cleanup with tuple unpacking ##############################
-    def convert_playlist(self, spotify_link: str):
-        # Get tracks and build querys
-
-        pk = self.sql.q_exec('SELECT * FROM Playlists WHERE sp_link = ?', (spotify_link,)).fetchone()[0]
-        print()
-
         
-    def get_yt_id_from_keywords(self, keywords:list) -> str:
+    def get_yt_id_from_keywords(self, keywords:list) -> str | None:
 
         raw_query = ' '.join(keywords)
-        re_subs = [(r"&", r"+"), (r" ", r"+"), (r",", r"+"), (r"+-+", r"+"), (r"++", r"+")]
-        while True:
-            new_query = self.re_sub_list(raw_query, re_subs)
-            if new_query == raw_query: break
-            raw_query = new_query
-        return self.get_yt_link_from_query(new_query)
+        re_subs = [(r"\&+", r"+"), (r"\s+", r"+"), (r",+", r"+"), (r"-+", r"+"), (r"\++", r"+")]
+        new_query = self.re_sub_list(raw_query, re_subs)
+        if (yt_id := re.search(r"/?v=(.*)", self.get_yt_link_from_query(new_query))):
+            return yt_id[1]
+        return None
 
 
-
-
-        playlist_name = self.get_playlist_name(spotify_link)
-        playlist_name = playlist_name.replace("&", "and")
-        # Load progress
-
-
-            
-
-        # else:
-        #     self.progress_dict[playlist_name] = {"playlist_id": playlist_id, "querys_done": {}}
-        #     querys_done = {}
-        # # Search for songs and add to playlist
-        # for query in querylist:
-        #     if not query in querys_done.keys():
-        #         video_link = self.get_link_to_video_by_query(query)
-        #         video_id = re.search(r"https://www.youtube.com/watch.v=(.*)", video_link, re.IGNORECASE).group(1)
-        #         playlist_item_id = self.yt_api.add_item_to_playlist(playlist_id, video_id)["id"]
-        #         querys_done[query] = playlist_item_id
-        #         # Save progress
-        #         self.progress_dict[playlist_name]["querys_done"] = querys_done
-        #         with open(self.path_to_progress_json, 'w') as json_file:
-        #             json.dump(self.progress_dict, json_file)
-        # # Search for songs not longer in playlist and delete
-        # for query in list(querys_done.keys()).copy():
-        #     if not query in querylist: 
-        #         self.yt_api.delete_item_from_playlist(querys_done[query])
-        #         # Save progress
-        #         querys_done.pop(query, None)
-        #         with open(self.path_to_progress_json, 'w') as json_file:
-        #             json.dump(self.progress_dict, json_file)
-                
-
-    def get_playlist_name(self, spotify_link):
+    def get_playlist_name(self, spotify_link) -> str:
         try:
             self.driver.get(spotify_link)
             return wait_for_element(By.CLASS_NAME, '''_meqsRRoQONlQfjhfxzp''', self.driver).text

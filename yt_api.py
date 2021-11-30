@@ -20,7 +20,7 @@ class Yt_api:
         self.client_secrets_path = r'client_secret.json'
         self.path_to_token = "token.pickle"
         self.logger = logging.getLogger(__name__)
-        
+
         self.serviceYT = build("youtube", "v3", credentials=self.load_credentials())
 
         
@@ -93,7 +93,7 @@ class Yt_api:
             sys.exit()
 
 
-    def add_item_to_playlist(self, playlist_id, video_id):
+    def add_item_to_playlist(self, playlist_id, video_id) -> dict:
         '''Add item to playlist, example:
         "https://www.youtube.com/watch?v=<playlistID>&list=<videoID>" \n
         doku: https://developers.google.com/youtube/v3/docs/playlistItems/insert'''
