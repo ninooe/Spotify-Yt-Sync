@@ -71,7 +71,6 @@ class Yt_sptfy_converter:
 
         self.driver = initialize_chromedriver()
         
-        # self.remove_tracks(playlist)
 
         # # Connect to spotify account
         # # Get Spotify Credentials
@@ -84,10 +83,11 @@ class Yt_sptfy_converter:
 
         # def sync_user_profile(profile_link) -> list[str]:
         #     return [link for link in self.get_playlistlinks_from_profile(profile_link)]
+
         
         # add all links in config to db if not present
         list(map(self.import_link, [config["sync_links"][entry] for entry in config["sync_links"]]))
-        # # update playlistnames in db
+        # update playlistnames in db
         sp_links_in_db = [link[0] for link in self.sql.q_exec('SELECT sp_link FROM Playlists').fetchall()]
         list(map(self.update_playlist_name, sp_links_in_db))
         for link in sp_links_in_db:
@@ -113,14 +113,10 @@ class Yt_sptfy_converter:
         self.remove_tracks(t_name, tuple(id for id, tr, at in db_entrys if (tr, at) not in tracks_artists))
         # list of items to be added to db and spotify
         new_too_add = [(tr, at) for tr, at in tracks_artists if not self.sql.get_entry_count(f'track=? AND artists=?', t_name, (tr, at))]
-        # add tracks to db
+        # add new tracks to db
         self.sql.q_exec_many(f'INSERT INTO {t_name} (track, artists) VALUES (?, ?)', new_too_add)
         # start sync with youtube
         self.sync_tracks_yt(pk)
-
-        
-
-
 
 
     def import_link(self, spotify_link: str):
@@ -288,7 +284,7 @@ class Yt_sptfy_converter:
             return self.get_playlist_name(spotify_link)
 
     
-    def get_playlist_creator():
+    def get_playlist_creator() -> str:
         pass
 
 
@@ -300,8 +296,9 @@ class Yt_sptfy_converter:
         list_link_objects = playlists_field.find_elements(By.TAG_NAME, 'a')
         return [item.get_attribute('href') for item in list_link_objects]
         
-    # onyl conceptual for now
+
     def terminal_controller(self):
+        # onyl conceptual for now
         print('Terminal controller, ')
         while True:
             command = input("type help for options exit to exit")
