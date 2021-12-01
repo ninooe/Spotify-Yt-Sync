@@ -1,3 +1,4 @@
+#! sfyt-env\Scripts\python.exe
 import datetime
 from getpass import getpass
 from inspect import _void
@@ -22,7 +23,7 @@ from sqlite_handler import *
 
 from configparser import ConfigParser
 import chromedriver_autoinstaller
-    
+
 
 class Yt_sptfy_converter:
 
@@ -40,7 +41,7 @@ class Yt_sptfy_converter:
 
         self.sql = Sqlite_handler("progress.sqlite")
 
-        self.debugmode = False
+        self.debugmode = True
 
 
         def initialize_chromedriver() -> webdriver.Chrome:
@@ -78,6 +79,8 @@ class Yt_sptfy_converter:
 
         # def sync_user_profile(profile_link) -> list[str]:
         #     return [link for link in self.get_playlistlinks_from_profile(profile_link)]
+
+        self.convert_links_in_config()
         
     
     def convert_links_in_config(self, configname: str = "config.ini"):
@@ -88,19 +91,16 @@ class Yt_sptfy_converter:
         config.read(configfile)
 
         # add all links in config to db if not present
-        list(map(self.import_link, [config["sync_links"][entry] for entry in config["sync_links"]]))
+        links = list(map(self.import_link, [config["sync_links"][entry] for entry in config["sync_links"]]))
+        concat_links = [jj for subl in links for jj in subl]
         # update playlistnames in db
-        sp_links_in_db = [link[0] for link in self.sql.q_exec('SELECT sp_link FROM Playlists').fetchall()]
-        list(map(self.update_playlist_info, sp_links_in_db))
-        for link in sp_links_in_db:
-            self.update_playlist(link)
+        list(map(self.update_playlist_info, concat_links))
+        for link in concat_links:
+            id = self.update_playlist(link)
+            self.sync_tracks_yt(id)
 
-        
-        # start sync with youtube TODO
-        # self.sync_tracks_yt(pk)
-        
 
-    def update_playlist(self, spotify_link: str):
+    def update_playlist(self, spotify_link: str) -> int:
         
         pk, p_name = self.sql.q_exec('SELECT id, name FROM Playlists WHERE sp_link=?', (spotify_link,)).fetchone()
         # create youtube playlist if not present
@@ -121,7 +121,7 @@ class Yt_sptfy_converter:
         new_too_add = [(tr, at) for tr, at in tracks_artists if not self.sql.get_entry_count(f'track=? AND artists=?', t_name, (tr, at))]
         # add new tracks to db
         self.sql.q_exec_many(f'INSERT INTO {t_name} (track, artists) VALUES (?, ?)', new_too_add)
-
+        return pk
 
 
     def import_link(self, spotify_link: str) -> list[str]:
@@ -266,7 +266,6 @@ class Yt_sptfy_converter:
         for link in resultlist.find_elements(By.TAG_NAME, 'a'):
             href = str(link.get_attribute('href'))
             if not href is None and re.search(r"^https://www.youtube.com/watch", href) and not re.match(r"\&list=", href):
-                print(link)
                 # add filter for r"[Clean]", r"[clean]"
                 return(href)
         self.logger.error(f"no video found for {query=}")
@@ -287,7 +286,8 @@ class Yt_sptfy_converter:
         try:
             self.driver.get(spotify_link)
             return wait_for_element(By.CLASS_NAME, '''_meqsRRoQONlQfjhfxzp''', self.driver).text
-        except Exception:
+        except Exception as err:
+            self.logger.error(err)
             self.logger.error("could not find playlist name, classname of element might be deprecated!")
             return "<[NAME NOT FOUND]>"
 
@@ -295,8 +295,10 @@ class Yt_sptfy_converter:
     def get_playlist_creator(self, spotify_link) -> str:
         try:
             self.driver.get(spotify_link)
-            return wait_for_element(By.CLASS_NAME, '''TQQSam9tGsRXGj4aGFSc''', self.driver).text
-        except Exception:
+            parentelem = wait_for_element(By.CLASS_NAME, '''FCLMqGL8hF5PIoL6VSbc''', self.driver)
+            return parentelem.text.splitlines()[0]
+        except Exception as err:
+            self.logger.error(err)
             self.logger.error("could not find playlist creator, classname of element might be deprecated!")
             return "<[CREATOR NOT FOUND]>"
 

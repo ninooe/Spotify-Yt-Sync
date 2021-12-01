@@ -1,3 +1,4 @@
+#! sfyt-env\Scripts\python.exe
 from typing import Optional
 from prettytable import PrettyTable
 import msvcrt
