@@ -285,7 +285,7 @@ class Yt_sptfy_converter:
     def get_playlist_name(self, spotify_link) -> str:
         try:
             self.driver.get(spotify_link)
-            return wait_for_element(By.CLASS_NAME, '''_meqsRRoQONlQfjhfxzp''', self.driver).text
+            return wait_for_element(By.CLASS_NAME, '''Afp2Urf1F4Ub6nHGSF9i''', self.driver).text
         except Exception as err:
             self.logger.error(err)
             self.logger.error("could not find playlist name, classname of element might be deprecated!")
@@ -295,8 +295,10 @@ class Yt_sptfy_converter:
     def get_playlist_creator(self, spotify_link) -> str:
         try:
             self.driver.get(spotify_link)
-            parentelem = wait_for_element(By.CLASS_NAME, '''FCLMqGL8hF5PIoL6VSbc''', self.driver)
-            return parentelem.text.splitlines()[0]
+            return wait_for_element(By.CLASS_NAME, '''Czg_RoYmXG0FPTHG9Kdb''', self.driver).text
+            # self.driver.get(spotify_link)
+            # parentelem = wait_for_element(By.CLASS_NAME, '''FCLMqGL8hF5PIoL6VSbc''', self.driver)
+            # return parentelem.text.splitlines()[0]
         except Exception as err:
             self.logger.error(err)
             self.logger.error("could not find playlist creator, classname of element might be deprecated!")
