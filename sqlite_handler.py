@@ -19,7 +19,6 @@ class Sqlite_handler():
         # create default tables if not present
         self.create_table_from_preset("Playlists", "Playlists")
 
-
     def get_entry_count(self, condition:str, table_name:str="sqlite_master", sqlvars:tuple=()) -> int:
         query = f'''SELECT count(*) FROM {table_name} WHERE {condition};'''
         cursor = self.q_exec(query, sqlvars)

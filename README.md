@@ -25,6 +25,9 @@ Add links for profiles or playlists to be converted in config.ini
 
 
 
+![Alt text](sql_schema.png?raw=true "SQL schema:")
+
+
 Do not change the windowsize for chromedriver
 
 
