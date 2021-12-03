@@ -26,7 +26,7 @@ Add links for profiles or playlists to be converted in config.ini
 
 SQL schema:
 
-![Alt text](sql_schema.png?raw=true "SQL schema:")
+![Alt text](sql_schema.png?raw=true "SQL schema")
 
 
 
