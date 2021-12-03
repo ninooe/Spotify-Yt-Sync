@@ -24,8 +24,10 @@ https://www.youtube.com/watch?v=HzICUriU3k0&ab_channel=JieJenn
 Add links for profiles or playlists to be converted in config.ini
 
 
+SQL schema:
 
 ![Alt text](sql_schema.png?raw=true "SQL schema:")
+
 
 
 Do not change the windowsize for chromedriver

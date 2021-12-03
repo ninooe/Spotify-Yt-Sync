@@ -1,0 +1,34 @@
+user:
+  ID: INTEGER PRIMARY KEY NOT NULL
+  name: TEXT
+  sp_link: TEXT
+
+user_playlist_mm:
+  user_ID: INT
+  playlist_ID: INT
+
+playlist:
+  ID: INTEGER PRIMARY KEY NOT NULL
+  name: TEXT
+  sp_link: TEXT NOT NULL
+  yt_id: TEXT
+
+playlist_track_mm:
+  playlist_ID: INT
+  track_ID: INT
+  yt_id: TEXT
+
+track:
+  ID: INTEGER PRIMARY KEY NOT NULL
+  name: TEXT
+  sp_link: TEXT
+  yt_link: TEXT
+
+artist_track_mm:
+  track_ID: INT
+  artist_ID: INT
+
+artist:
+  ID: INTEGER PRIMARY KEY NOT NULL
+  name: TEXT
+  sp_link: TEXT
