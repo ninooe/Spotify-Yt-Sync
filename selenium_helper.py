@@ -20,10 +20,9 @@ def wait_for_element(locator: str, query: str, driver: selenium.webdriver, timeo
         selenium.webdriver.remote.webelement.WebElement / None
     """
     try:
-        parentElement = WebDriverWait(driver, timeout).until(
+        return WebDriverWait(driver, timeout).until(
                 EC.presence_of_element_located((locator, query))
             )
-        return parentElement
     except Exception:
         logging.debug(f"{Exception} occured while waiting for element")
         return None
