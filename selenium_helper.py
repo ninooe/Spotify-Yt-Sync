@@ -7,7 +7,7 @@ import logging
 
 ########### todo Proper Exceptionhandeling in case of connection lost connection ############
 
-def wait_for_element(locator: str, query: str, driver: selenium.webdriver, timeout: int = 30) -> WebElement:
+def wait_for_element(locator: str, query: str, driver: selenium.webdriver, timeout: int = 30) -> Optional[WebElement]:
     """Let selenium driver wait for element
 
     Args:
