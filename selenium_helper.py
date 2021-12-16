@@ -5,7 +5,7 @@ from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.remote.webelement import WebElement
 import logging
 
-########### todo Proper Exceptionhandeling in case of connection lost connection ############
+########### TODO Proper Exceptionhandeling in case of lost connection ############
 
 def wait_for_element(locator: str, query: str, driver: selenium.webdriver, timeout: int = 30) -> Optional[WebElement]:
     """Let selenium driver wait for element
