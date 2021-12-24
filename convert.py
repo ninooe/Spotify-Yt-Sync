@@ -1,3 +1,4 @@
+
 #! sfyt-env\Scripts\python.exe
 import datetime
 from getpass import getpass
@@ -97,24 +98,26 @@ class Yt_sptfy_converter:
         list(map(self.update_playlist_info, concat_links))
         for link in concat_links:
             id = self.update_playlist(link)
-            self.sync_tracks_yt(id)
+            # self.sync_tracks_yt(id)
 
 
     def update_playlist(self, spotify_link: str) -> int:
         
-        pk, p_name = self.sql.q_exec('SELECT id, name FROM Playlists WHERE sp_link=?', (spotify_link,)).fetchone()
+        pk, p_name = self.sql.q_exec('SELECT ID, name FROM playlist WHERE sp_link=?', (spotify_link,)).fetchone()
         # create youtube playlist if not present
-        if not (yt_id := self.sql.q_exec('SELECT yt_id FROM Playlists WHERE ID=?', (pk,)).fetchone()[0]):
-            p_name:str = p_name.replace("&", "and")
-            yt_id = self.yt_api.create_playlist(p_name)["id"]
-            self.sql.q_exec('UPDATE Playlists SET yt_id=? WHERE sp_link=?', (yt_id, spotify_link))
-        # create table in database if not present
-        t_name = f'Playlist_{pk}'
-        self.sql.create_table_from_preset('Playlist_template', t_name)
-        # get entrys in db
-        db_entrys = self.sql.q_exec(f'SELECT ID, track, artists FROM {t_name}').fetchall()
+        yt_p_name:str = p_name.replace("&", "and")
+        if not (yt_id := self.sql.q_exec('SELECT yt_id FROM playlist WHERE ID=?', (pk,)).fetchone()[0]):
+            yt_id = self.yt_api.create_playlist(yt_p_name)["id"]
+            self.sql.q_exec('UPDATE playlist SET yt_id=? WHERE sp_link=?', (yt_id, spotify_link))
+        # update name in yt if changed
+        if not self.yt_api.list_playlist(yt_id)["items"][0]["snippet"]["localized"]["title"] == yt_p_name:
+            self.yt_api.update_playlist(yt_id, snippet={"title": yt_p_name})
         # get entrys in spotify
         tracks_artists = self.get_tracks_and_artists(spotify_link)
+        return pk
+
+        # get entrys in db
+        db_entrys = self.sql.q_exec(f'SELECT ID, track, artists FROM {t_name}').fetchall()
         # list for items to be removed from db and yt_playlist
         self.remove_tracks(t_name, tuple(id for id, tr, at in db_entrys if (tr, at) not in tracks_artists))
         # list of items to be added to db and spotify
@@ -205,8 +208,8 @@ class Yt_sptfy_converter:
             
         self.driver.get(spotify_link)
         parentElement = wait_for_element(By.XPATH, '''//*[@id="main"]/div/div[2]/div[3]/main/div[2]/div[2]/div/div/div[2]/section/div[2]/div[3]/div[1]''', self.driver)
-        if not parentElement:
-            return self.get_tracks_and_artists(spotify_link)
+        # if not parentElement:
+        #     return self.get_tracks_and_artists(spotify_link)
 
         subElementList: list[WebElement] = []
         while True:
@@ -221,6 +224,8 @@ class Yt_sptfy_converter:
                 lines: list[str] = element.text.splitlines()
                 # the structure of lines:
                 # ['title', (optional 'E' tag), 'artist', 'album', 'time_since_added_to_playlist', 'duration']
+
+                print(lines)
                 if lines[2] == 'E':
                     tracklist.append((lines[1], lines[3]))
                 else:

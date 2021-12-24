@@ -4,6 +4,7 @@ import sys
 import pickle
 import os
 import logging
+from typing import Optional
 
 
 from google.auth.transport import Request
@@ -67,30 +68,61 @@ class Yt_api:
             pickle.dump(credentials, f)
 
         return credentials        
-        
+
+
+    def list_playlist(self, playlist_id: str) -> Optional[dict]:
+        '''list playlist, found by id \n
+        doku: https://developers.google.com/youtube/v3/docs/playlists/list'''
+        try:
+            request = self.serviceYT.playlists().list(
+                part = "contentDetails, id, localizations, player, snippet, status",
+                id = playlist_id
+            )
+            return request.execute()
+        except Exception as err:
+            logging.error(err)
+            return False
+
 
     def create_playlist(self, playlist_name, privacyStatus="public"):
         '''create playlist, privacyStatus can be "public" or "private" \n
         doku: https://developers.google.com/youtube/v3/docs/playlists/insert'''
-        try:
-            requestbody = {
-                "snippet": {
-                    "title": str(playlist_name),
-                    "description": "New playlist description"
-                },
-                "status": {
-                    "privacyStatus": privacyStatus
-                }
+        requestbody = {
+            "snippet": {
+                "title": str(playlist_name),
+                "description": "New playlist description"
+            },
+            "status": {
+                "privacyStatus": privacyStatus
             }
+        }
+        try:
             request = self.serviceYT.playlists().insert(
                 part="snippet, status",
                 body=requestbody
             )
-            response = request.execute()
-            return response
+            return request.execute()
         except Exception as e:
-            print(e)
-            sys.exit()
+            logging.error(e)
+            return False
+
+
+    def update_playlist(self, playlist_id: str, priv_status: str = None, snippet: dict = None):
+        '''update playlist, privacyStatus can be "public" or "private" \n
+        doku: https://developers.google.com/youtube/v3/docs/playlists/update'''
+        requestbody = {"id": playlist_id}
+        if priv_status: requestbody["status"] = priv_status
+        requestbody["snippet"] = {}
+        if snippet: requestbody["snippet"] = snippet
+        try:
+            request = self.serviceYT.playlists().update(
+                part="snippet, status",
+                body=requestbody
+            )
+            return request.execute()
+        except Exception as e:
+            logging.error(e)
+            return False
 
 
     def add_item_to_playlist(self, playlist_id, video_id) -> dict:
