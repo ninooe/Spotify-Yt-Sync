@@ -7,6 +7,8 @@ from typing import Iterable
 import yaml
 from yaml.error import YAMLError
 
+import read_yaml 
+
 
 class Sqlite_handler():
 
@@ -15,21 +17,29 @@ class Sqlite_handler():
         self.logger = logging.getLogger(__name__)
         self.conn: Connection = self.load_database(database_file)
 
-        self.sql_schema = self.load_schema("sqlite_schema.yaml")
-        # create default tables if not present
-        self.create_table_from_preset("Playlists", "Playlists")
+        self.create_db_from_yml("sqlite_schema.yml")
+
+
+    def create_db_from_yml(self, file_path: str):
+        yaml_dict = read_yaml.read_yml_file(file_path)
+        for tablename, schema in yaml_dict.items():
+            self.create_table_from_schema(tablename, schema)
+
+
+    def create_table_from_schema(self, tablename: str, schema: dict[str, str]) -> None:
+        if self.get_entry_count(f"type='table' AND name='{tablename}'"):
+            self.logger.info(f"did not create {tablename}, already present")
+            return
+        column_querys = ", ".join([f"{key} {struct}" for key, struct in schema.items()])
+        self.q_exec(f"CREATE TABLE {tablename} ({column_querys});")
+        self.conn.commit()
+
 
     def get_entry_count(self, condition:str, table_name:str="sqlite_master", sqlvars:tuple=()) -> int:
         query = f'''SELECT count(*) FROM {table_name} WHERE {condition};'''
         cursor = self.q_exec(query, sqlvars)
         return cursor.fetchone()[0]
 
-    def load_schema(self, path:str) -> dict:
-        with open(path, "r") as file:
-            try:
-                return yaml.load(file, Loader=yaml.FullLoader)
-            except (YAMLError):
-                self.logger.error(f'failed to load yaml {path=}')
 
     def load_database(self, path:str) -> Connection:
         connection = None
@@ -40,18 +50,11 @@ class Sqlite_handler():
             self.logger.error(f"{err}' occurred while connecting to {path=}")
         return connection
 
+
     def close_conn(self):
         self.conn.commit()
         self.conn.close()
-    
-    def create_table_from_preset(self, preset:str, tablename:str) -> str:
-        if self.get_entry_count(f"type='table' AND name='{tablename}'"):
-            self.logger.info(f"did not create {tablename}, already present")
-            return
-        columns = self.sql_schema['Tables'][preset]
-        column_querys = ", ".join([f"{key} {struct}" for key, struct in columns.items()])
-        self.q_exec(f"CREATE TABLE {tablename} ({column_querys});")
-        self.conn.commit()
+
 
     def q_exec(self, query: str, args: tuple = ()) -> Cursor:
         cursor = self.conn.cursor()
@@ -60,6 +63,7 @@ class Sqlite_handler():
         self.conn.commit()
         return cursor
 
+
     def q_exec_many(self, query: str, iter_params: Iterable) -> Cursor:
         cursor = self.conn.cursor()
         self.logger.info(f"{query=}, {iter_params=}")
@@ -67,4 +71,6 @@ class Sqlite_handler():
         self.conn.commit()
         return cursor
 
-        
+
+if __name__ == "__main__":
+    db = Sqlite_handler()
