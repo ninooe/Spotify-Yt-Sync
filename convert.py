@@ -139,10 +139,11 @@ class Yt_sptfy_converter:
 
         # parse links
         linklist = get_playlist_links(spotify_link)
+
         # add to playlists to db if not present
-        links_in_db = [link[0] for link in self.sql.q_exec('SELECT sp_link FROM Playlists').fetchall()]
+        links_in_db = [link[0] for link in self.sql.q_exec('SELECT sp_link FROM playlist').fetchall()]
         links_to_add = [(link,) for link in linklist if not link in links_in_db]
-        self.sql.q_exec_many("INSERT INTO Playlists (sp_link) VALUES (?)", links_to_add)
+        self.sql.q_exec_many("INSERT INTO playlist (sp_link) VALUES (?)", links_to_add)
         return linklist
 
 
@@ -165,11 +166,14 @@ class Yt_sptfy_converter:
         list(map(self.yt_api.delete_item_from_playlist, [yt_id for _, yt_id in remove if yt_id]))
 
 
+    
+
     def update_playlist_info(self, spotify_link:str):  
         name = self.get_playlist_name(spotify_link)
-        self.sql.q_exec(f"UPDATE Playlists SET name = ? WHERE sp_link = ?", (name, spotify_link))
-        creator = self.get_playlist_creator(spotify_link)
-        self.sql.q_exec(f"UPDATE Playlists SET creator = ? WHERE sp_link = ?", (creator, spotify_link))
+        self.sql.q_exec(f"UPDATE playlist SET name = ? WHERE sp_link = ?", (name, spotify_link))
+
+        # creator = self.get_playlist_creator(spotify_link)
+        # self.sql.q_exec(f"UPDATE playlist SET creator = ? WHERE sp_link = ?", (creator, spotify_link))
 
 
     @staticmethod
@@ -272,7 +276,7 @@ class Yt_sptfy_converter:
         return ""
 
         
-    def get_yt_id_from_keywords(self, keywords:list) -> str | None:
+    def get_yt_id_from_keywords(self, keywords:list) -> str | None: 
 
         raw_query = ' '.join(keywords)
         re_subs = [(r"\&+", r"+"), (r"\s+", r"+"), (r",+", r"+"), (r"-+", r"+"), (r"\++", r"+")]
@@ -322,7 +326,8 @@ def main():
     abspath = os.path.abspath(__file__)
     dname = os.path.dirname(abspath)
     os.chdir(dname)
-    Yt_sptfy_converter().convert_links_in_config()
+
+    Yt_sptfy_converter()
 
 if __name__ == "__main__":
     main()
