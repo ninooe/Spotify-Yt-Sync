@@ -1,4 +1,5 @@
 
+from typing import Optional
 import selenium
 from selenium.webdriver.support import expected_conditions as EC
 from selenium.webdriver.support.ui import WebDriverWait
@@ -23,6 +24,6 @@ def wait_for_element(locator: str, query: str, driver: selenium.webdriver, timeo
         return WebDriverWait(driver, timeout).until(
                 EC.presence_of_element_located((locator, query))
             )
-    except Exception:
-        logging.debug(f"{Exception} occured while waiting for element")
+    except Exception as err:
+        logging.debug(f"{err} occured while waiting for element")
         return None
