@@ -1,13 +1,13 @@
 
 #! sfyt-env\Scripts\python.exe
 import datetime
-from getpass import getpass
 from inspect import _void
 import os
 import sys
 import re
 import time
 import logging
+
 
 import selenium
 from selenium import webdriver
@@ -17,10 +17,16 @@ from selenium.webdriver.support import expected_conditions as EC, select
 from selenium.webdriver.support.ui import Select, WebDriverWait
 from selenium.webdriver.common.keys import Keys
 from selenium.webdriver.common.action_chains import ActionChains
+from read_yaml import read_yml_file
+
+
+import spotipy
+from spotipy.oauth2 import SpotifyClientCredentials
 
 from yt_api import *
 from selenium_helper import *
-from sqlite_handler import *
+
+import sqlite_handler
 
 from configparser import ConfigParser
 import chromedriver_autoinstaller
@@ -30,19 +36,34 @@ class Yt_sptfy_converter:
 
 
     def __init__(self):
-        
-        # Load Api do quota check
+
+
+        # Read Configfile
+        self.configname = "config.ini"
+        configfile = self.configname
+        self.config = ConfigParser()
+        self.config.read(configfile)
+
+        for key, var in self.config["spotify"].items():
+            os.environ[key] = var
+
+        # load apilib
         self.yt_api = Yt_api()
+        # quota check
         _ = self.yt_api.get_user_channel()['items'][0]["id"]
 
         self.logger = logging.getLogger(__name__)
         logging.basicConfig(filename='scripttest.log', encoding='utf-8', level=logging.INFO)
 
+        # load spotify apilib
+        self.spty_api = spotipy.Spotify(client_credentials_manager=SpotifyClientCredentials())
 
-
-        self.sql = Sqlite_handler("progress.sqlite")
+        # get sql handler
+        self.sql = sqlite_handler.Sqlite_handler("progress.sqlite")
 
         self.debugmode = True
+
+        self.test()
 
 
         def initialize_chromedriver() -> webdriver.Chrome:
@@ -69,51 +90,133 @@ class Yt_sptfy_converter:
         self.driver = initialize_chromedriver()
         
 
-        # # Connect to spotify account
-        # # Get Spotify Credentials
-        # self.loginName = config["spotify"]["accountNameOrEmail"]
-        # if config["spotify"]["password"] != None:
-        #     self.pw = config["spotify"]["password"]
-        # else:
-        #     self.pw = getpass('Password: ')
-        # self.open_spotify_session()
-
-        # def sync_user_profile(profile_link) -> list[str]:
-        #     return [link for link in self.get_playlistlinks_from_profile(profile_link)]
-
         self.convert_links_in_config()
         
-    
-    def convert_links_in_config(self, configname: str = "config.ini"):
+    def test(self):
 
-        # Read Configfile
-        configfile = configname
-        config = ConfigParser()
-        config.read(configfile)
+        self.playlist_from_spotify("5mxDiK1jscv6V0EtYdRp0z")
+        sys.exit()
+
+
+    
+
+    
+    def add_playlist(self, playlist_id):
+        pass
+
+    def add_artist(self, sp_ID: str, name: str = None) -> int:
+        if (id := self.sql.q_exec("SELECT ID FROM artist WHERE sp_ID=?", (sp_ID,)).fetchone()):
+            return id[0]
+        if not name:
+            name = self.s//pty_api.artist(sp_ID)["name"]
+        return self.sql.q_exec('INSERT INTO artist (sp_ID, name) VALUES (?, ?)', (sp_ID, name)).lastrowid
+
+
+    def add_track(self, sp_ID: str, name: str = None, artist_idb: list = None) -> int:
+        if (id := self.sql.q_exec("SELECT ID FROM track WHERE sp_ID=?", (sp_ID,)).fetchone()):
+            return id[0]
+        if not name or not artist_ids:
+            name = api_result["name"]
+            artist_ids = [aid["id"] for aid in api_result["artists"]]
+        track_id = self.sql.q_exec('INSERT INTO track (sp_ID, name) VALUES (?, ?)', (sp_ID, name)).lastrowid
+        [self.link_artist_to_track(track_id, aid) for aid in artist_ids]
+        return track_id
+
+
+    def add_playlist(self, sp_ID: str, name: str = None) -> int:
+        if (resp := self.sql.q_exec("SELECT ID, name FROM playlist WHERE sp_ID=?", (sp_ID,)).fetchone()):
+            return resp[0]
+        if not name:
+            name = self.spty_api.artist(sp_ID)["name"]
+        return self.sql.q_exec('INSERT INTO artist (sp_ID, name) VALUES (?, ?)', (sp_ID, name)).lastrowid
+
+        
+    def link_artist_to_track(self, track_id, artist_id):
+        if self.sql.q_exec("SELECT * FROM artist_track_mm WHERE track_id=? AND artist_id=?", (track_id, artist_id)).fetchone():
+            return
+        self.sql.q_exec("INSERT INTO artist_track_mm (track_ID, artist_ID) VALUES (?, ?)", (track_id, artist_id))
+        
+
+    def playlist_from_spotify(self, playlist_id):
+        # get information from spotify api
+        playlist_items = []
+        api_result = self.spty_api.playlist_items(playlist_id, additional_types=("track",))
+        while api_result:
+            for item in api_result["items"]:
+                artists = [{"name": artist["name"], "sp_ID": artist["id"]} for artist in item["track"]["artists"]]
+                # add artists to db if not present and get id
+                artist_ids = [self.add_artist(**k) for k in artists]
+                playlist_items.append({
+                    "name": item["track"]["name"],
+                    "sp_ID": item["track"]["id"],
+                    "artist_ids": artist_ids
+                })
+            if api_result['next']:
+                api_result = self.spty_api.next(api_result)
+            else:
+                api_result = None
+        # add tracks to database
+        [self.add_track(**k) for k in playlist_items]
+
+
+
+
+        
+        
+                
+
+        # artists_uniqe = set([jj for subl in [item["artists"] for item in playlist_items] for jj in subl])
+
+        # write to db
+        # list(dict.fromkeys(
+                # artist_ids = [self.add_artist(**k) for k in artists]
+
+                # track_id = self.add_track(item["id"])
+                # for artist in item["track"]["artists"]:
+                #     artist_id = self.add_artist(artist["id"], artist["name"])
+                #     self.link_artist_to_track(track_id, artist_id)
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+    def convert_links_in_config(self):
 
         # add all links in config to db if not present
-        links = list(map(self.import_link, [config["sync_links"][entry] for entry in config["sync_links"]]))
+        links = list(map(self.import_link, [self.config["sync_links"][entry] for entry in self.config["sync_links"]]))
         concat_links = [jj for subl in links for jj in subl]
+
+
         # update playlistnames in db
         list(map(self.update_playlist_info, concat_links))
         for link in concat_links:
             id = self.update_playlist(link)
             # self.sync_tracks_yt(id)
 
-
-    def update_playlist(self, spotify_link: str) -> int:
-        
-        pk, p_name = self.sql.q_exec('SELECT ID, name FROM playlist WHERE sp_link=?', (spotify_link,)).fetchone()
+    def playlist_to_youtube(self, playlist_id: str) -> int:
+        pk, p_name = self.sql.q_exec('SELECT ID, name FROM playlist WHERE sp_link=?', (spotify_id,)).fetchone()
         # create youtube playlist if not present
-        yt_p_name:str = p_name.replace("&", "and")
+        yt_p_name: str = p_name.replace("&", "and")
         if not (yt_id := self.sql.q_exec('SELECT yt_id FROM playlist WHERE ID=?', (pk,)).fetchone()[0]):
             yt_id = self.yt_api.create_playlist(yt_p_name)["id"]
-            self.sql.q_exec('UPDATE playlist SET yt_id=? WHERE sp_link=?', (yt_id, spotify_link))
+            self.sql.q_exec('UPDATE playlist SET yt_id=? WHERE sp_link=?', (yt_id, spotify_id))
         # update name in yt if changed
         if not self.yt_api.list_playlist(yt_id)["items"][0]["snippet"]["localized"]["title"] == yt_p_name:
             self.yt_api.update_playlist(yt_id, snippet={"title": yt_p_name})
         # get entrys in spotify
-        tracks_artists = self.get_tracks_and_artists(spotify_link)
+        tracks_artists = self.get_tracks_and_artists(spotify_id)
         return pk
 
         # get entrys in db
@@ -168,8 +271,6 @@ class Yt_sptfy_converter:
         self.sql.q_exec_many(f"DELETE FROM {tablename} WHERE ID = ?", [(id,) for id, _ in remove])
         list(map(self.yt_api.delete_item_from_playlist, [yt_id for _, yt_id in remove if yt_id]))
 
-
-    
 
     def update_playlist_info(self, spotify_link:str):  
         name = self.get_playlist_name(spotify_link)
@@ -226,10 +327,10 @@ class Yt_sptfy_converter:
                 # ['title', (optional 'E' tag), 'artist', 'album', 'time_since_added_to_playlist', 'duration']
 
                 print(lines)
-                if lines[2] == 'E':
-                    tracklist.append((lines[1], lines[3]))
+                if lines[1] == 'E':
+                    tracklist.append((lines[0], lines[2]))
                 else:
-                    tracklist.append((lines[1], lines[2]))
+                    tracklist.append((lines[0], lines[1]))
 
             # if new elements are found scroll to last element 
             if not new_elements: break

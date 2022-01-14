@@ -1,6 +1,6 @@
 [spotify]
-accountNameOrEmail = 
-password = 
+SPOTIPY_CLIENT_ID = 
+SPOTIPY_CLIENT_SECRET = 
 
 [sync_links] #Add keys in str
 link1 = 

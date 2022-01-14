@@ -1,7 +1,7 @@
 user:
   ID: INTEGER PRIMARY KEY NOT NULL
   name: TEXT
-  sp_link: TEXT
+  sp_ID: TEXT
 
 user_playlist_mm:
   user_ID: INT
@@ -10,19 +10,19 @@ user_playlist_mm:
 playlist:
   ID: INTEGER PRIMARY KEY NOT NULL
   name: TEXT
-  sp_link: TEXT NOT NULL
-  yt_id: TEXT
+  sp_ID: TEXT NOT NULL
+  yt_ID: TEXT
 
 playlist_track_mm:
   playlist_ID: INT
   track_ID: INT
-  yt_id: TEXT
+  yt_ID: TEXT
 
 track:
   ID: INTEGER PRIMARY KEY NOT NULL
   name: TEXT
-  sp_link: TEXT
-  yt_link: TEXT
+  sp_ID: TEXT 
+  yt_ID: TEXT 
 
 artist_track_mm:
   track_ID: INT
@@ -31,4 +31,4 @@ artist_track_mm:
 artist:
   ID: INTEGER PRIMARY KEY NOT NULL
   name: TEXT
-  sp_link: TEXT
+  sp_ID: TEXT 
