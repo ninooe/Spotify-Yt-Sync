@@ -94,32 +94,35 @@ class Yt_sptfy_converter:
         
     def test(self):
 
+        # print(self.spty_api.track(self.sql.q_exec("SELECT sp_ID FROM track WHERE ID = 1").fetchone()[0]))
         self.playlist_from_spotify("5mxDiK1jscv6V0EtYdRp0z")
         sys.exit()
 
 
-    
-
-    
-    def add_playlist(self, playlist_id):
-        pass
+    def link2id(link):
+        link = re.search(r"\/([^/]+)$", link)[1]
+        if (match := re.search(r"watch\?v=([a-zA-Z0-9]+)", link)):
+            link = match[1]
+        return re.search(r"^([a-zA-Z0-9]+)", link)[1]
+  
 
     def add_artist(self, sp_ID: str, name: str = None) -> int:
         if (id := self.sql.q_exec("SELECT ID FROM artist WHERE sp_ID=?", (sp_ID,)).fetchone()):
             return id[0]
         if not name:
-            name = self.s//pty_api.artist(sp_ID)["name"]
+            name = self.spty_api.artist(sp_ID)["name"]
         return self.sql.q_exec('INSERT INTO artist (sp_ID, name) VALUES (?, ?)', (sp_ID, name)).lastrowid
 
 
-    def add_track(self, sp_ID: str, name: str = None, artist_idb: list = None) -> int:
+    def add_track(self, sp_ID: str, name: str = None, artist_ids: list = None) -> int:
         if (id := self.sql.q_exec("SELECT ID FROM track WHERE sp_ID=?", (sp_ID,)).fetchone()):
             return id[0]
         if not name or not artist_ids:
+            api_result = self.spty_api(sp_ID)
             name = api_result["name"]
             artist_ids = [aid["id"] for aid in api_result["artists"]]
         track_id = self.sql.q_exec('INSERT INTO track (sp_ID, name) VALUES (?, ?)', (sp_ID, name)).lastrowid
-        [self.link_artist_to_track(track_id, aid) for aid in artist_ids]
+        [self.link_artist_to_track(aid, track_id) for aid in artist_ids]
         return track_id
 
 
@@ -127,20 +130,26 @@ class Yt_sptfy_converter:
         if (resp := self.sql.q_exec("SELECT ID, name FROM playlist WHERE sp_ID=?", (sp_ID,)).fetchone()):
             return resp[0]
         if not name:
-            name = self.spty_api.artist(sp_ID)["name"]
-        return self.sql.q_exec('INSERT INTO artist (sp_ID, name) VALUES (?, ?)', (sp_ID, name)).lastrowid
+            name = self.spty_api.playlist(sp_ID)["name"]
+        return self.sql.q_exec('INSERT INTO playlist (sp_ID, name) VALUES (?, ?)', (sp_ID, name)).lastrowid
 
         
-    def link_artist_to_track(self, track_id, artist_id):
+    def link_artist_to_track(self, artist_id, track_id):
         if self.sql.q_exec("SELECT * FROM artist_track_mm WHERE track_id=? AND artist_id=?", (track_id, artist_id)).fetchone():
             return
         self.sql.q_exec("INSERT INTO artist_track_mm (track_ID, artist_ID) VALUES (?, ?)", (track_id, artist_id))
         
+        
+    def link_playlist_to_track(self, playlist_id, track_id):
+        if self.sql.q_exec("SELECT * FROM playlist_track_mm WHERE track_id=? AND playlist_id=?", (track_id, playlist_id)).fetchone():
+            return
+        self.sql.q_exec("INSERT INTO playlist_track_mm (track_ID, playlist_ID) VALUES (?, ?)", (track_id, playlist_id))
+        
 
-    def playlist_from_spotify(self, playlist_id):
+    def playlist_from_spotify(self, sp_ID):
         # get information from spotify api
         playlist_items = []
-        api_result = self.spty_api.playlist_items(playlist_id, additional_types=("track",))
+        api_result = self.spty_api.playlist_items(sp_ID, additional_types=("track",))
         while api_result:
             for item in api_result["items"]:
                 artists = [{"name": artist["name"], "sp_ID": artist["id"]} for artist in item["track"]["artists"]]
@@ -156,7 +165,9 @@ class Yt_sptfy_converter:
             else:
                 api_result = None
         # add tracks to database
-        [self.add_track(**k) for k in playlist_items]
+        track_ids = [self.add_track(**k) for k in playlist_items]
+        playlist_id = self.add_playlist(sp_ID, )
+        [self.link_playlist_to_track(playlist_id, tid) for tid in track_ids]
 
 
 
@@ -296,52 +307,6 @@ class Yt_sptfy_converter:
         return string_to_edit
 
 
-    def get_tracks_and_artists(self, spotify_link: str) -> list[(str, str), ]:
-        """
-        Args:
-            spotify_link (str): spotify webplayer link to playlist
-
-        Returns:
-            list[(str, str),]: list of tuples containing (title, artits) of tracks in playlist
-        """
-        
-        tracklist: list[(str, str),] = []
-            
-        self.driver.get(spotify_link)
-        parentElement = wait_for_element(By.XPATH, '''//*[@id="main"]/div/div[2]/div[3]/main/div[2]/div[2]/div/div/div[2]/section/div[2]/div[3]/div[1]''', self.driver)
-        # if not parentElement:
-        #     return self.get_tracks_and_artists(spotify_link)
-
-        subElementList: list[WebElement] = []
-        while True:
-            # Wait for page to load
-            time.sleep(0.5)
-            found_elements = parentElement.find_elements(By.CSS_SELECTOR, '''div[role='row']''')
-            new_elements = [elem for elem in found_elements if not elem in subElementList]
-            subElementList.extend(new_elements)
-
-            # extract relevant info from new Webelements
-            for element in new_elements:
-                lines: list[str] = element.text.splitlines()
-                # the structure of lines:
-                # ['title', (optional 'E' tag), 'artist', 'album', 'time_since_added_to_playlist', 'duration']
-
-                print(lines)
-                if lines[1] == 'E':
-                    tracklist.append((lines[0], lines[2]))
-                else:
-                    tracklist.append((lines[0], lines[1]))
-
-            # if new elements are found scroll to last element 
-            if not new_elements: break
-            actions = ActionChains(self.driver)
-            actions.move_to_element(new_elements[-1])
-            actions.perform()
-
-        del tracklist[0]
-        return tracklist
-        
-
     def open_spotify_session(self):
 
         # Open Link
@@ -382,7 +347,7 @@ class Yt_sptfy_converter:
         return ""
 
         
-    def get_yt_id_from_keywords(self, keywords:list) -> str | None: 
+    def get_yt_id_from_keywords(self, keywords: list) -> str | None: 
 
         raw_query = ' '.join(keywords)
         re_subs = [(r"\&+", r"+"), (r"\s+", r"+"), (r",+", r"+"), (r"-+", r"+"), (r"\++", r"+")]
@@ -390,29 +355,6 @@ class Yt_sptfy_converter:
         if (yt_id := re.search(r"/?v=(.*)", self.get_yt_link_from_query(new_query))):
             return yt_id[1]
         return None
-
-
-    def get_playlist_name(self, spotify_link) -> str:
-        try:
-            self.driver.get(spotify_link)
-            return wait_for_element(By.CLASS_NAME, '''Afp2Urf1F4Ub6nHGSF9i''', self.driver).text
-        except Exception as err:
-            self.logger.error(err)
-            self.logger.error("could not find playlist name, classname of element might be deprecated!")
-            return "<[NAME NOT FOUND]>"
-
-    
-    def get_playlist_creator(self, spotify_link) -> str:
-        try:
-            self.driver.get(spotify_link)
-            return wait_for_element(By.CLASS_NAME, '''Czg_RoYmXG0FPTHG9Kdb''', self.driver).text
-            # self.driver.get(spotify_link)
-            # parentelem = wait_for_element(By.CLASS_NAME, '''FCLMqGL8hF5PIoL6VSbc''', self.driver)
-            # return parentelem.text.splitlines()[0]
-        except Exception as err:
-            self.logger.error(err)
-            self.logger.error("could not find playlist creator, classname of element might be deprecated!")
-            return "<[CREATOR NOT FOUND]>"
 
 
     def get_playlistlinks_from_profile(self, profile_link) -> list[str]:
