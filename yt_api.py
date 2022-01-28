@@ -70,6 +70,20 @@ class Yt_api:
         return credentials        
 
 
+    def list_video(self, video_id: str) -> Optional[dict]:
+        '''list video, found by id \n
+        doku: https://developers.google.com/youtube/v3/docs/videos/list \n
+        video_id can be a comma-seperated list to get multiple results'''
+        try:
+            request = self.serviceYT.videos().list(
+                part = "snippet, contentDetails",
+                id = video_id
+            )   
+            return request.execute()
+        except Exception as err:
+            logging.error(err)
+            
+
     def list_playlist(self, playlist_id: str) -> Optional[dict]:
         '''list playlist, found by id \n
         doku: https://developers.google.com/youtube/v3/docs/playlists/list'''
@@ -81,7 +95,6 @@ class Yt_api:
             return request.execute()
         except Exception as err:
             logging.error(err)
-            return False
 
 
     def create_playlist(self, playlist_name, privacyStatus="public"):
@@ -104,7 +117,6 @@ class Yt_api:
             return request.execute()
         except Exception as e:
             logging.error(e)
-            return False
 
 
     def update_playlist(self, playlist_id: str, priv_status: str = None, snippet: dict = None):
@@ -122,7 +134,6 @@ class Yt_api:
             return request.execute()
         except Exception as e:
             logging.error(e)
-            return False
 
 
     def add_item_to_playlist(self, playlist_id, video_id) -> dict:
@@ -146,8 +157,7 @@ class Yt_api:
             response = request.execute()
             return response
         except Exception as e:
-            print(e)
-            sys.exit()
+            logging.error(e)
 
 
     def delete_item_from_playlist(self, playlist_item_id):
@@ -160,8 +170,7 @@ class Yt_api:
             response = request.execute()
             return response
         except Exception as e:
-            print(e)
-            sys.exit()
+            logging.error(e)
 
 
     def get_playlists(self, channel_id):
@@ -177,8 +186,7 @@ class Yt_api:
             response = request.execute()
             return response
         except Exception as e:
-            print(e)
-            sys.exit()
+            logging.error(e)
 
 
     def get_user_channel(self):
@@ -192,5 +200,5 @@ class Yt_api:
             response = request.execute()
             return response
         except Exception as e:
-            print(e)
-            sys.exit()
+            logging.error(e)
+

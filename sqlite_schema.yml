@@ -1,34 +1,35 @@
 user:
   ID: INTEGER PRIMARY KEY NOT NULL
   name: TEXT
-  sp_ID: TEXT
+  sp_id: TEXT
 
-user_playlist_mm:
-  user_ID: INT
-  playlist_ID: INT
+user_playlist_mn:
+  user_id: INT
+  playlist_id: INT
 
 playlist:
   ID: INTEGER PRIMARY KEY NOT NULL
   name: TEXT
-  sp_ID: TEXT NOT NULL
-  yt_ID: TEXT
+  sp_id: TEXT NOT NULL
+  yt_id: TEXT
 
-playlist_track_mm:
-  playlist_ID: INT
-  track_ID: INT
+playlist_track_mn:
+  playlist_id: INT
+  track_id: INT
   yt_ID: TEXT
 
 track:
   ID: INTEGER PRIMARY KEY NOT NULL
   name: TEXT
-  sp_ID: TEXT 
-  yt_ID: TEXT 
+  sp_id: TEXT 
+  yt_id: TEXT 
+  yt_title: TEXT
 
-artist_track_mm:
-  track_ID: INT
-  artist_ID: INT
+artist_track_mn:
+  track_id: INT
+  artist_id: INT
 
 artist:
   ID: INTEGER PRIMARY KEY NOT NULL
   name: TEXT
-  sp_ID: TEXT 
+  sp_id: TEXT 
