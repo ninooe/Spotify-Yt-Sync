@@ -104,7 +104,8 @@ class Yt_sptfy_converter:
         
         self.import_playlist_from_spotify("5mxDiK1jscv6V0EtYdRp0z")
         # self.get_yt_id_playlist("5mxDiK1jscv6V0EtYdRp0z")
-        print(self.supplement_yt_ids())
+        # print(self.supplement_yt_ids())
+        self.insert_videos_to_playlists()
         # print(self.update_playlist_name("0CEj2EbTgWaCtYppgJwtQe"))
         sys.exit()
 
@@ -274,8 +275,8 @@ class Yt_sptfy_converter:
     
     
     def supplement_yt_ids(self) -> None:
-        cursor = self.sql.q_exec("SELECT ID FROM track WHERE yt_id IS NULL").fetchall()
-        idtt = [(self.get_yt_id_track(res[0]), res[0]) for res in cursor]
+        cur = self.sql.q_exec("SELECT ID FROM track WHERE yt_id IS NULL").fetchall()
+        idtt = [(self.get_yt_id_track(res[0]), res[0]) for res in cur]
         idtt_parsed = [(ii[0], ii[1], ee) for ii, ee in idtt]
         self.sql.q_exec_many("UPDATE track SET yt_id=?, yt_title=? WHERE ID=?", idtt_parsed)
 
@@ -288,39 +289,34 @@ class Yt_sptfy_converter:
         logging.info(f'{spotify_link} did not match user or playlist regex')
 
 
-    def update_links_in_config(self):
+    def import_links_in_config(self) -> None:
         links = [self.config["sync_links"][entry] for entry in self.config["sync_links"]]
         ids = [self.spotify_ids_from_link(link) for link in links]
         # merge lists
         ids = [jj for subl in ids for jj in subl]
-
+        [self.import_playlist_from_spotify(pl_id) for pl_id in ids]
+        
+        
+    def insert_videos_to_playlists(self):
+        cur = self.sql.q_exec("SELECT playlist_id, track_id FROM playlist_track_mn WHERE yt_id IS NULL").fetchall()
+        for pid, tid in cur:
+            t_yt_id = self.sql.q_exec("SELECT yt_id FROM track WHERE ID=?", (tid,)).fetchone()[0]
+            p_yt_id = self.sql.q_exec("SELECT yt_id FROM playlist WHERE ID=?", (pid,)).fetchone()[0]
+            if not t_yt_id or not p_yt_id:
+                continue
+            yt_id = self.yt_api.add_item_to_playlist(p_yt_id, t_yt_id)
+            if not yt_id:
+                sys.exit(0)
+            self.sql.q_exec("UPDATE playlist_track_mn SET yt_id=? WHERE track_id=? AND playlist_id=?", (yt_id, tid, pid))
+            
+            
+            
+            
         # # update playlistnames in db
         # list(map(self.update_playlist_info, ids))
         # for link in ids:
         #     id = self.update_playlist(link)
         #     # self.sync_tracks_yt(id)
-
-
-    def open_spotify_session(self):
-
-        # Open Link
-        self.driver.get(r"https://www.spotify.com")
-
-        # Navigate to loginpage
-        confirmkey = wait_for_element(By.XPATH, '''//*[@id="__next"]/div[1]/header/div/nav/ul/li[6]/a''', self.driver)
-        confirmkey.click()
-
-        # Confirm login
-        loginformUsername = wait_for_element(By.NAME, '''username''', self.driver)
-        loginformUsername.send_keys(self.loginName)
-
-        self.driver.find_element_by_name('''password''').send_keys(self.pw)
-        self.driver.find_element_by_id("login-button").click()
-
-        if (confirmButton := wait_for_element(By.ID, '''onetrust-accept-btn-handler''', self.driver)):
-            confirmButton.click()
-
-
 
 
 def main():

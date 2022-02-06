@@ -16,7 +16,7 @@ playlist:
 playlist_track_mn:
   playlist_id: INT
   track_id: INT
-  yt_ID: TEXT
+  yt_id: TEXT
 
 track:
   ID: INTEGER PRIMARY KEY NOT NULL
