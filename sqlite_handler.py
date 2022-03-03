@@ -20,7 +20,7 @@ class Sqlite_handler():
         self.create_db_from_yml("sqlite_schema.yml")
 
 
-    def create_db_from_yml(self, file_path: str):
+    def create_db_from_yml(self, file_path: str) -> None:
         yaml_dict = read_yaml.read_yml_file(file_path)
         for tablename, schema in yaml_dict.items():
             self.create_table_from_schema(tablename, schema)
@@ -51,7 +51,7 @@ class Sqlite_handler():
         return connection
 
 
-    def close_conn(self):
+    def close_conn(self) -> None:
         self.conn.commit()
         self.conn.close()
 
