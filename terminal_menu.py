@@ -8,7 +8,7 @@ import inspect
 import re
 from convert import *
 
-
+###################### not functional by now wip ####################################
 class Terminal_controller():
 
     def __init__(self, converter: Yt_sptfy_converter):
