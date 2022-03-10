@@ -93,9 +93,10 @@ class Yt_sptfy_converter:
 
         self.driver = initialize_chromedriver()
         
-        self.test()
-
-        self.convert_links_in_config()
+        
+        self.import_links_in_config()
+        self.supplement_yt_ids()
+        self.insert_videos_to_playlists()
         
     def test(self):
 
@@ -105,12 +106,12 @@ class Yt_sptfy_converter:
         self.import_playlist_from_spotify("5mxDiK1jscv6V0EtYdRp0z")
         # self.get_yt_id_playlist("5mxDiK1jscv6V0EtYdRp0z")
         # print(self.supplement_yt_ids())
-        self.insert_videos_to_playlists()
         # print(self.update_playlist_name("0CEj2EbTgWaCtYppgJwtQe"))
         sys.exit()
-
+        
+    
     @staticmethod
-    def link2id(link):
+    def link2id(link: str) -> str:
         '''works for any spotify and youtube link'''
         link = re.search(r"\/([^/]+)$", link)[1]
         if (match := re.search(r"watch\?v=([a-zA-Z0-9-_]+)", link)):
@@ -119,7 +120,7 @@ class Yt_sptfy_converter:
   
 
     # read information from spotify        
-    def get_playlists_from_user(self, sp_id) -> list[str]:
+    def get_playlists_from_user(self, sp_id: str) -> list[str]:
         playlist_ids = []
         api_result = self.spty_api.user_playlists(sp_id)
         while api_result:
@@ -184,11 +185,24 @@ class Yt_sptfy_converter:
 
     # write information to youtube
     def sync_playlist_name_sp2yt(self, playlist_id: str) -> None:
-        yt_id = self.sql.q_exec("SELECT yt_ID FROM playlist where sp_id = ?", (playlist_id,)).fetchone()
+        yt_id = self.sql.q_exec("SELECT yt_ID FROM playlist WHERE sp_id = ?", (playlist_id,)).fetchone()
         playlist_name = self.playlist_name_from_spotify(playlist_id)
         if not self.yt_api.list_playlist(yt_id)["items"][0]["snippet"]["localized"]["title"] == playlist_name:
             self.yt_api.update_playlist(yt_id, snippet={"title": playlist_name})
-
+            
+    
+    def insert_videos_to_playlists(self) -> None:
+        cur = self.sql.q_exec("SELECT playlist_id, track_id FROM playlist_track_mn WHERE yt_id IS NULL").fetchall()
+        for pid, tid in cur:
+            t_yt_id = self.sql.q_exec("SELECT yt_id FROM track WHERE ID=?", (tid,)).fetchone()[0]
+            p_yt_id = self.get_yt_id_playlist(pid)
+            if not t_yt_id:
+                continue
+            yt_id = self.yt_api.add_item_to_playlist(p_yt_id, t_yt_id)['id']
+            if not yt_id:
+                sys.exit(0)
+            self.sql.q_exec("UPDATE playlist_track_mn SET yt_id=? WHERE track_id=? AND playlist_id=?", (yt_id, tid, pid))
+    
 
     # read information from youtube
     def get_yt_title(self, yt_ids: list[str]) -> Optional[list[str]]:
@@ -221,13 +235,12 @@ class Yt_sptfy_converter:
 
 
     def get_yt_id_playlist(self, playlist_id) -> str:
-        """gets yt_id for playlist from DB, creates playlist if not present"""
-        yt_id, name = self.sql.q_exec('SELECT yt_id, name FROM playlist WHERE sp_id=?', (playlist_id,)).fetchone()
+        yt_id, name = self.sql.q_exec('SELECT yt_id, name FROM playlist WHERE ID=?', (playlist_id,)).fetchone()
         if not name: 
             self.playlist_name_from_spotify(playlist_id)
         if not yt_id:
             yt_id = self.yt_api.create_playlist(name)["id"]
-            self.sql.q_exec('UPDATE playlist SET yt_id=? WHERE sp_id=?', (yt_id, playlist_id))
+            self.sql.q_exec('UPDATE playlist SET yt_id=? WHERE ID=?', (yt_id, playlist_id))
         return yt_id
 
 
@@ -244,12 +257,12 @@ class Yt_sptfy_converter:
             keywords = [res[0] for res in self.sql.q_exec(f"SELECT name FROM artist WHERE ID IN {artist_ids}").fetchall()]
         keywords.append(name)
         return quote("+".join(keywords))
-    
-    
+
+
     def get_yt_id_and_title_from_query(self, query: str) -> Optional[tuple[str, str]]:
         '''query must be sanitized for url'''
         self.driver.get(f"https://www.youtube.com/results?search_query={query}")
-        
+
         filter_for = ["clean"]
         filter_for = [ff for ff in filter_for if not re.match(ff, query, re.IGNORECASE)]
 
@@ -272,13 +285,13 @@ class Yt_sptfy_converter:
     def get_yt_id_track(self, id: str | int) -> tuple[str, str]:
         query = self.yt_query_from_id(id)
         return self.get_yt_id_and_title_from_query(query)
-    
-    
-    def supplement_yt_ids(self) -> None:
-        cur = self.sql.q_exec("SELECT ID FROM track WHERE yt_id IS NULL").fetchall()
-        idtt = [(self.get_yt_id_track(res[0]), res[0]) for res in cur]
-        idtt_parsed = [(ii[0], ii[1], ee) for ii, ee in idtt]
-        self.sql.q_exec_many("UPDATE track SET yt_id=?, yt_title=? WHERE ID=?", idtt_parsed)
+
+
+    def supplement_yt_ids(self, batchsize: int = 100) -> None:
+        while (cur := self.sql.q_exec("SELECT ID FROM track WHERE yt_id IS NULL").fetchall()[:batchsize]):
+            idtt = [(self.get_yt_id_track(res[0]), res[0]) for res in cur]
+            idtt_parsed = [(ii[0], ii[1], ee) for ii, ee in idtt]
+            self.sql.q_exec_many("UPDATE track SET yt_id=?, yt_title=? WHERE ID=?", idtt_parsed)
 
 
     def spotify_ids_from_link(self, spotify_link: str) -> list[str]:
@@ -295,20 +308,9 @@ class Yt_sptfy_converter:
         # merge lists
         ids = [jj for subl in ids for jj in subl]
         [self.import_playlist_from_spotify(pl_id) for pl_id in ids]
-        
-        
-    def insert_videos_to_playlists(self):
-        cur = self.sql.q_exec("SELECT playlist_id, track_id FROM playlist_track_mn WHERE yt_id IS NULL").fetchall()
-        for pid, tid in cur:
-            t_yt_id = self.sql.q_exec("SELECT yt_id FROM track WHERE ID=?", (tid,)).fetchone()[0]
-            p_yt_id = self.sql.q_exec("SELECT yt_id FROM playlist WHERE ID=?", (pid,)).fetchone()[0]
-            if not t_yt_id or not p_yt_id:
-                continue
-            yt_id = self.yt_api.add_item_to_playlist(p_yt_id, t_yt_id)
-            if not yt_id:
-                sys.exit(0)
-            self.sql.q_exec("UPDATE playlist_track_mn SET yt_id=? WHERE track_id=? AND playlist_id=?", (yt_id, tid, pid))
-            
+
+
+
             
             
             
