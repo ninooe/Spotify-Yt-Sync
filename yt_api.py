@@ -5,6 +5,8 @@ import pickle
 import os
 import logging
 from typing import Optional
+from urllib import response
+import time
 
 
 from google.auth.transport import Request
@@ -13,10 +15,26 @@ from google_auth_oauthlib.flow import InstalledAppFlow
 from google.auth.transport.requests import Request
 
 
+def retry_if_no_response(func):
+    '''retry decorator for Yt_api class'''    
+    def check_response(*args, **kwargs):
+        if not args[0].numb_of_retrys or not args[0].wait_till_retry:
+            return func(*args, **kwargs)
+        for _ in range(args[0].numb_of_retrys):
+            if (resp := func(*args, **kwargs)):
+                return resp
+        time.sleep(args[0].wait_till_retry)
+    return check_response
+
+
 class Yt_api:
     '''doku: https://developers.google.com/youtube/v3/docs'''
 
     def __init__(self) -> None:
+        
+        # used by the retry_if_no_response decorator
+        self.numb_of_retrys = 5
+        self.wait_till_retry = 5
         
         self.client_secrets_path = r'client_secret.json'
         self.path_to_token = "token.pickle"
@@ -67,9 +85,10 @@ class Yt_api:
             self.logger.info('Saving Credentials for Future Use...')
             pickle.dump(credentials, f)
 
-        return credentials        
+        return credentials   
 
 
+    @retry_if_no_response
     def list_video(self, video_id: str) -> Optional[dict]:
         '''list video, found by id \n
         doku: https://developers.google.com/youtube/v3/docs/videos/list \n
@@ -84,6 +103,7 @@ class Yt_api:
             logging.error(err)
             
 
+    @retry_if_no_response
     def list_playlist(self, playlist_id: str) -> Optional[dict]:
         '''list playlist, found by id \n
         doku: https://developers.google.com/youtube/v3/docs/playlists/list'''
@@ -97,6 +117,7 @@ class Yt_api:
             logging.error(err)
 
 
+    @retry_if_no_response
     def create_playlist(self, playlist_name, privacyStatus="public"):
         '''create playlist, privacyStatus can be "public" or "private" \n
         doku: https://developers.google.com/youtube/v3/docs/playlists/insert'''
@@ -119,6 +140,7 @@ class Yt_api:
             logging.error(e)
 
 
+    @retry_if_no_response
     def update_playlist(self, playlist_id: str, priv_status: str = None, snippet: dict = None):
         '''update playlist, privacyStatus can be "public" or "private" \n
         doku: https://developers.google.com/youtube/v3/docs/playlists/update'''
@@ -136,6 +158,7 @@ class Yt_api:
             logging.error(e)
 
 
+    @retry_if_no_response
     def add_item_to_playlist(self, playlist_id, video_id) -> dict:
         '''Add item to playlist, example:
         "https://www.youtube.com/watch?v=<playlistID>&list=<videoID>" \n
@@ -154,12 +177,12 @@ class Yt_api:
                     }
                 }
             )
-            response = request.execute()
-            return response
+            return request.execute()
         except Exception as e:
             logging.error(e)
 
 
+    @retry_if_no_response
     def delete_item_from_playlist(self, playlist_item_id):
         '''Remove item from playlist by id \n
         doku: https://developers.google.com/youtube/v3/docs/playlistItems/delete'''
@@ -167,12 +190,12 @@ class Yt_api:
             request = self.serviceYT.playlistItems().delete(
                 id=playlist_item_id
             )
-            response = request.execute()
-            return response
+            return request.execute()
         except Exception as e:
             logging.error(e)
 
 
+    @retry_if_no_response
     def get_playlists(self, channel_id):
         '''Get playlistitem by ID, example:
         "https://www.youtube.com/channel/<channelID>" \n
@@ -183,12 +206,12 @@ class Yt_api:
                 channelId=channel_id,
                 maxResults=25,
             )
-            response = request.execute()
-            return response
+            return request.execute()
         except Exception as e:
             logging.error(e)
 
 
+    @retry_if_no_response
     def get_user_channel(self):
         '''Returns the channel for the current user \n
         doku: https://developers.google.com/youtube/v3/docs/channels/list'''
@@ -197,8 +220,7 @@ class Yt_api:
                 part="snippet,contentDetails,statistics",
                 mine=True
             )
-            response = request.execute()
-            return response
+            return request.execute()
         except Exception as e:
             logging.error(e)
 

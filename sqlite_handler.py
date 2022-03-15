@@ -58,7 +58,7 @@ class Sqlite_handler():
 
     def q_exec(self, query: str, args: tuple = ()) -> Cursor:
         cursor = self.conn.cursor()
-        self.logger.info(f"{query=}")
+        self.logger.info(f"{query=} {args=}")
         cursor.execute(query, args)
         self.conn.commit()
         return cursor

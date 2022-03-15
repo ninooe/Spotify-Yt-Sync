@@ -38,11 +38,13 @@ import chromedriver_autoinstaller
 ## usefull links ##
 # https://spotipy.readthedocs.io/en/2.19.0/#features
 
-class Yt_sptfy_converter:
+class Yt_sptfy_converter(Selenium_helper):
 
 
     def __init__(self):
-
+        # init selenium helper
+        self.debugmode = True
+        super().__init__()
 
         # Read Configfile
         self.configname = "config.ini"
@@ -66,33 +68,6 @@ class Yt_sptfy_converter:
 
         # get sql handler
         self.sql = sqlite_handler.Sqlite_handler("progress.sqlite")
-
-        self.debugmode = True
-
-
-        def initialize_chromedriver() -> webdriver.Chrome:
-            chromedriver_autoinstaller.install()
-            options = Options()
-            # options.add_argument("--start-maximized")
-            options.add_argument('ignore-certificate-errors')
-            options.add_argument("--enable-webgl")
-            options.add_experimental_option('excludeSwitches', ['enable-automation'])
-            if not self.debugmode: 
-                options.add_argument('log-level=2')
-                options.add_argument("--headless") 
-            driver = webdriver.Chrome(options=options)
-
-
-            # Check if driver version matches chrome installation
-            str1 = driver.capabilities['browserVersion']
-            str2 = driver.capabilities['chrome']['chromedriverVersion'].split(' ')[0]
-            if str1[0:2] != str2[0:2]:  
-                logging.error("chromedriver_autoinstaller, failed to install matching chromedriver version. \nDownload manually from https://chromedriver.chromium.org/downloads and add path to driver initialisation")
-                sys.exit(2)
-            return driver
-
-        self.driver = initialize_chromedriver()
-        
         
         self.import_links_in_config()
         self.supplement_yt_ids()
@@ -102,8 +77,11 @@ class Yt_sptfy_converter:
 
         # print(self.spty_api.track(self.sql.q_exec("SELECT sp_id FROM track WHERE ID = 1").fetchone()[0]))
         # print(self.spotify_ids_from_link("https://open.spotify.com/user/eo81sypyqdkath705ozd16yzh"))
-        
-        self.import_playlist_from_spotify("5mxDiK1jscv6V0EtYdRp0z")
+        print(self.driver)
+        self.driver.get("https://www.google.com")
+        print(self)
+        # print(self.yt_api.get_playlists("UCd1hlQIGMMANVKuIU99j4YA"))
+        # self.import_playlist_from_spotify("5mxDiK1jscv6V0EtYdRp0z")
         # self.get_yt_id_playlist("5mxDiK1jscv6V0EtYdRp0z")
         # print(self.supplement_yt_ids())
         # print(self.update_playlist_name("0CEj2EbTgWaCtYppgJwtQe"))
@@ -117,6 +95,31 @@ class Yt_sptfy_converter:
         if (match := re.search(r"watch\?v=([a-zA-Z0-9-_]+)", link)):
             link = match[1]
         return re.search(r"^([a-zA-Z0-9-_]+)", link)[1]
+    
+    
+    def get_webdriver(self) -> BaseWebDriver:
+        return self.initialize_chromedriver()
+    
+    
+    def initialize_chromedriver(self) -> webdriver.Chrome:
+        chromedriver_autoinstaller.install()
+        options = Options()
+        # options.add_argument("--start-maximized")
+        options.add_argument('ignore-certificate-errors')
+        options.add_argument("--enable-webgl")
+        options.add_experimental_option('excludeSwitches', ['enable-automation'])
+        if not hasattr(self, 'debugmode') or not self.debugmode: 
+            options.add_argument('log-level=2')
+            options.add_argument("--headless") 
+        driver = webdriver.Chrome(options=options)
+        # Check if driver version matches chrome installation
+        str1 = driver.capabilities['browserVersion']
+        str2 = driver.capabilities['chrome']['chromedriverVersion'].split(' ')[0]
+        if str1[0:2] != str2[0:2]:  
+            logging.error("chromedriver_autoinstaller, failed to install matching chromedriver version. \n\
+                          Download manually from https://chromedriver.chromium.org/downloads and add path to driver initialisation")
+            sys.exit(2)
+        return driver
   
 
     # read information from spotify        
@@ -218,7 +221,7 @@ class Yt_sptfy_converter:
             for item in api_result["items"]:
                 artists = [{"name": artist["name"], "sp_id": artist["id"]} for artist in item["track"]["artists"]]
                 # add artists to db if not present and get id
-                artist_ids = [self.add_artist(**k) for k in artists]
+                artist_ids = [self.add_artist(**k) for k in artists if k['sp_id']]
                 playlist_items.append({
                     "name": item["track"]["name"],
                     "sp_id": item["track"]["id"],
@@ -227,9 +230,9 @@ class Yt_sptfy_converter:
             if api_result['next']:
                 api_result = self.spty_api.next(api_result)
             else:
-                api_result = None 
+                api_result = None     
         # add tracks to database
-        track_ids = [self.add_track(**k) for k in playlist_items]
+        track_ids = [self.add_track(**k) for k in playlist_items if k["sp_id"]]
         playlist_id = self.add_playlist(sp_id, )
         [self.link_playlist_to_track(playlist_id, tid) for tid in track_ids]
 
@@ -245,7 +248,6 @@ class Yt_sptfy_converter:
 
 
     def yt_query_from_id(self, id: str) -> str:
-
         artist_ids = tuple(res[0] for res in self.sql.q_exec("SELECT artist_id FROM artist_track_mn WHERE track_id=?", (id,)).fetchall())
         name = self.sql.q_exec("SELECT name FROM track WHERE ID=?", (id,)).fetchone()[0]
         if not artist_ids:
@@ -258,7 +260,7 @@ class Yt_sptfy_converter:
         keywords.append(name)
         return quote("+".join(keywords))
 
-
+    @Selenium_helper.error_reload_webdriver
     def get_yt_id_and_title_from_query(self, query: str) -> Optional[tuple[str, str]]:
         '''query must be sanitized for url'''
         self.driver.get(f"https://www.youtube.com/results?search_query={query}")
@@ -287,11 +289,14 @@ class Yt_sptfy_converter:
         return self.get_yt_id_and_title_from_query(query)
 
 
-    def supplement_yt_ids(self, batchsize: int = 100) -> None:
+    def supplement_yt_ids(self, batchsize: int = 10) -> None:
         while (cur := self.sql.q_exec("SELECT ID FROM track WHERE yt_id IS NULL").fetchall()[:batchsize]):
-            idtt = [(self.get_yt_id_track(res[0]), res[0]) for res in cur]
-            idtt_parsed = [(ii[0], ii[1], ee) for ii, ee in idtt]
-            self.sql.q_exec_many("UPDATE track SET yt_id=?, yt_title=? WHERE ID=?", idtt_parsed)
+            try:
+                idtt = [(self.get_yt_id_track(res[0]), res[0]) for res in cur]
+                idtt_parsed = [(ii[0], ii[1], ee) for ii, ee in idtt]
+                self.sql.q_exec_many("UPDATE track SET yt_id=?, yt_title=? WHERE ID=?", idtt_parsed)
+            except TypeError as err:
+                logging.error(f'retry for supplement_yt_ids {err=}')
 
 
     def spotify_ids_from_link(self, spotify_link: str) -> list[str]:
@@ -311,14 +316,15 @@ class Yt_sptfy_converter:
 
 
 
-            
-            
-            
+
         # # update playlistnames in db
         # list(map(self.update_playlist_info, ids))
         # for link in ids:
         #     id = self.update_playlist(link)
         #     # self.sync_tracks_yt(id)
+
+
+
 
 
 def main():
