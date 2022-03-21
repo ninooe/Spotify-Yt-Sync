@@ -7,7 +7,7 @@ import logging
 from typing import Optional
 from urllib import response
 import time
-
+import inspect
 
 from google.auth.transport import Request
 from googleapiclient.discovery import build
@@ -34,7 +34,7 @@ class Yt_api:
         
         # used by the retry_if_no_response decorator
         self.numb_of_retrys = 5
-        self.wait_till_retry = 5
+        self.wait_till_retry = 10
         
         self.client_secrets_path = r'client_secret.json'
         self.path_to_token = "token.pickle"
@@ -42,7 +42,7 @@ class Yt_api:
 
         self.serviceYT = build("youtube", "v3", credentials=self.load_credentials())
 
-        
+
     def load_credentials(self):
 
         def credentials_from_file(path:str):
@@ -67,7 +67,7 @@ class Yt_api:
                 self.logger.info(f"{error=} while loading {self.path_to_token}, removing before retry")
                 os.remove(self.path_to_token)
                 return self.load_credentials()
-        
+
 
         self.logger.info('Fetching New Tokens...')
         flow = InstalledAppFlow.from_client_secrets_file(
@@ -98,10 +98,12 @@ class Yt_api:
                 part = "snippet, contentDetails",
                 id = video_id
             )   
-            return request.execute()
+            resp = request.execute()
+            self.logger.debug(f"{inspect.stack()[0][3]} with {locals().items()} returned {resp}")
+            return resp
         except Exception as err:
-            logging.error(err)
-            
+            self.logger.error(err)
+
 
     @retry_if_no_response
     def list_playlist(self, playlist_id: str) -> Optional[dict]:
@@ -112,9 +114,11 @@ class Yt_api:
                 part = "contentDetails, id, localizations, player, snippet, status",
                 id = playlist_id
             )
-            return request.execute()
+            resp = request.execute()
+            self.logger.debug(f"{inspect.stack()[0][3]} with {locals().items()} returned {resp}")
+            return resp
         except Exception as err:
-            logging.error(err)
+            self.logger.error(err)
 
 
     @retry_if_no_response
@@ -135,9 +139,11 @@ class Yt_api:
                 part="snippet, status",
                 body=requestbody
             )
-            return request.execute()
+            resp = request.execute()
+            self.logger.debug(f"{inspect.stack()[0][3]} with {locals().items()} returned {resp}")
+            return resp
         except Exception as e:
-            logging.error(e)
+            self.logger.error(e)
 
 
     @retry_if_no_response
@@ -153,9 +159,11 @@ class Yt_api:
                 part="snippet, status",
                 body=requestbody
             )
-            return request.execute()
+            resp = request.execute()
+            self.logger.debug(f"{inspect.stack()[0][3]} with {locals().items()} returned {resp}")
+            return resp
         except Exception as e:
-            logging.error(e)
+            self.logger.error(e)
 
 
     @retry_if_no_response
@@ -177,9 +185,11 @@ class Yt_api:
                     }
                 }
             )
-            return request.execute()
+            resp = request.execute()
+            self.logger.debug(f"{inspect.stack()[0][3]} with {locals().items()} returned {resp}")
+            return resp
         except Exception as e:
-            logging.error(e)
+            self.logger.error(e)
 
 
     @retry_if_no_response
@@ -190,9 +200,11 @@ class Yt_api:
             request = self.serviceYT.playlistItems().delete(
                 id=playlist_item_id
             )
-            return request.execute()
+            resp = request.execute()
+            self.logger.debug(f"{inspect.stack()[0][3]} with {locals().items()} returned {resp}")
+            return resp
         except Exception as e:
-            logging.error(e)
+            self.logger.error(e)
 
 
     @retry_if_no_response
@@ -206,9 +218,11 @@ class Yt_api:
                 channelId=channel_id,
                 maxResults=25,
             )
-            return request.execute()
+            resp = request.execute()
+            self.logger.debug(f"{inspect.stack()[0][3]} with {locals().items()} returned {resp}")
+            return resp
         except Exception as e:
-            logging.error(e)
+            self.logger.error(e)
 
 
     @retry_if_no_response
@@ -220,7 +234,9 @@ class Yt_api:
                 part="snippet,contentDetails,statistics",
                 mine=True
             )
-            return request.execute()
+            resp = request.execute()
+            self.logger.debug(f"{inspect.stack()[0][3]} with {locals().items()} returned {resp}")
+            return resp
         except Exception as e:
-            logging.error(e)
+            self.logger.error(e)
 

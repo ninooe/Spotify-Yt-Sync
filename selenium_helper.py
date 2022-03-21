@@ -10,7 +10,6 @@ from selenium.webdriver.support.ui import WebDriverWait
 
 from selenium.common.exceptions import TimeoutException, WebDriverException
 
-########### TODO Proper Exceptionhandeling in case of connection lost ############
 
 def wait_for_element(locator: str, query: str, driver: Type[BaseWebDriver], timeout: int = 30) -> Optional[WebElement]:
     """Let selenium driver wait for element
@@ -34,27 +33,12 @@ def wait_for_element(locator: str, query: str, driver: Type[BaseWebDriver], time
         return None
 
 
-# def error_reload_webdriver(driver: BaseWebDriver, driver_generator: Callable[[], BaseWebDriver]):
-#     '''reloads the webdriver in case of error\n
-#     decorator only to be used on methods of Selenium_helper class'''
-#     def decorator(func):
-#         def wrapper(*args, **kwargs):
-#             for _ in range(args[0]):
-#                 try:
-#                     return func(*args, **kwargs)
-#                 except TimeoutException as err:
-#                     logging.error(f'reloading driver {err=}')
-#                     driver = driver_generator
-#         return wrapper
-#     return decorator
-
-
-
 class Selenium_helper(ABC):
-    
+
+
     def __init__(self) -> None:
         self.driver = self.get_webdriver()
-
+        self.logger = logging.getLogger(__name__)
 
     @abstractmethod
     def get_webdriver(self) -> BaseWebDriver:
@@ -68,7 +52,7 @@ class Selenium_helper(ABC):
             try:
                 return func(*args, **kwargs)
             except (TimeoutException, WebDriverException) as err:
-                logging.error(f'reloading driver {err=}')
+                args[0].logger.error(f'reloading driver {err=}')
                 args[0].driver = args[0].get_webdriver()
                 return func(*args, **kwargs)
         return wrapper

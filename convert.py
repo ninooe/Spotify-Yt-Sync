@@ -1,27 +1,20 @@
 
 #! sfyt-env\Scripts\python.exe
-from ast import keyword
 import datetime
-from inspect import _void
 from urllib.parse import quote
 
 import os
 import sys
 import re
 import time
-import logging
-from pyparsing import nullDebugAction
+import logging, logging.config
 
 
-import selenium
 from selenium import webdriver
 from selenium.webdriver.chrome.options import Options
 from selenium.webdriver.common.by import By
-from selenium.webdriver.support import expected_conditions as EC, select
-from selenium.webdriver.support.ui import Select, WebDriverWait
-from selenium.webdriver.common.keys import Keys
-from selenium.webdriver.common.action_chains import ActionChains
-from read_yaml import read_yml_file
+
+import read_yaml
 
 
 import spotipy
@@ -60,15 +53,22 @@ class Yt_sptfy_converter(Selenium_helper):
         # quota check
         _ = self.yt_api.get_user_channel()['items'][0]["id"]
 
+
         self.logger = logging.getLogger(__name__)
-        logging.basicConfig(filename='scripttest.log', encoding='utf-8', level=logging.INFO)
+        
+
+        # to be moved 
+        log_conf = read_yaml.read_yml_file('logging.yml')
+        logging.config.dictConfig(log_conf)
 
         # load spotify apilib
         self.spty_api = spotipy.Spotify(client_credentials_manager=SpotifyClientCredentials())
 
         # get sql handler
         self.sql = sqlite_handler.Sqlite_handler("progress.sqlite")
-        
+
+        # sys.exit()
+
         self.import_links_in_config()
         self.supplement_yt_ids()
         self.insert_videos_to_playlists()
@@ -116,11 +116,11 @@ class Yt_sptfy_converter(Selenium_helper):
         str1 = driver.capabilities['browserVersion']
         str2 = driver.capabilities['chrome']['chromedriverVersion'].split(' ')[0]
         if str1[0:2] != str2[0:2]:  
-            logging.error("chromedriver_autoinstaller, failed to install matching chromedriver version. \n\
+            self.logger.error("chromedriver_autoinstaller, failed to install matching chromedriver version. \n\
                           Download manually from https://chromedriver.chromium.org/downloads and add path to driver initialisation")
             sys.exit(2)
         return driver
-  
+
 
     # read information from spotify        
     def get_playlists_from_user(self, sp_id: str) -> list[str]:
@@ -251,7 +251,7 @@ class Yt_sptfy_converter(Selenium_helper):
         artist_ids = tuple(res[0] for res in self.sql.q_exec("SELECT artist_id FROM artist_track_mn WHERE track_id=?", (id,)).fetchall())
         name = self.sql.q_exec("SELECT name FROM track WHERE ID=?", (id,)).fetchone()[0]
         if not artist_ids:
-            logging.error(f"no artists found for track_{id=}")
+            self.logger.error(f"no artists found for track_{id=}")
             return quote(name)
         if len(artist_ids) == 1:
             keywords = [self.sql.q_exec("SELECT name FROM artist WHERE ID=?", (artist_ids[0],)).fetchone()[0]]
@@ -296,7 +296,7 @@ class Yt_sptfy_converter(Selenium_helper):
                 idtt_parsed = [(ii[0], ii[1], ee) for ii, ee in idtt]
                 self.sql.q_exec_many("UPDATE track SET yt_id=?, yt_title=? WHERE ID=?", idtt_parsed)
             except TypeError as err:
-                logging.error(f'retry for supplement_yt_ids {err=}')
+                self.logger.error(f'retry for supplement_yt_ids {err=}')
 
 
     def spotify_ids_from_link(self, spotify_link: str) -> list[str]:
@@ -304,7 +304,7 @@ class Yt_sptfy_converter(Selenium_helper):
             return [self.link2id(spotify_link)]
         if re.search(r"https://open.spotify.com/user/", spotify_link):
             return self.get_playlists_from_user(self.link2id(spotify_link))
-        logging.info(f'{spotify_link} did not match user or playlist regex')
+        self.logger.info(f'{spotify_link} did not match user or playlist regex')
 
 
     def import_links_in_config(self) -> None:
