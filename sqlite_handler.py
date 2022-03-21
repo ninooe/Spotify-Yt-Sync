@@ -21,7 +21,7 @@ class Sqlite_handler():
 
 
     def create_db_from_yml(self, file_path: str) -> None:
-        yaml_dict = read_yaml.read_yml_file(file_path)
+        yaml_dict = read_yaml.file2dict(file_path)
         for tablename, schema in yaml_dict.items():
             self.create_table_from_schema(tablename, schema)
 
