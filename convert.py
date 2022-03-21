@@ -58,7 +58,7 @@ class Yt_sptfy_converter(Selenium_helper):
         
 
         # to be moved 
-        log_conf = read_yaml.read_yml_file('logging.yml')
+        log_conf = read_yaml.file2dict('logging.yml')
         logging.config.dictConfig(log_conf)
 
         # load spotify apilib
